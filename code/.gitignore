@@ -1,0 +1,6 @@
+*.swp
+
+# Racets code we don't want to track
+/racets.rkt
+/racets-mlang.rkt
+/facets.rkt
