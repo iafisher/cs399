@@ -49,10 +49,23 @@
     (displayln (obs bob-policy arg bob-grades))))
 
 ; How do I implement this?
-(define print-average-grade (lambda (student-list) 0))
+(define print-average-grade
+  (lambda (arg)
+    (let ([alice-grade (compute-grade (obs alice-policy arg alice-grades))]
+	  [bob-grade (compute-grade (obs bob-policy arg bob-grades))])
+      (displayln (/ (+ alice-grade bob-grade) 2)))))
+
+(define compute-grade 
+  (lambda (grade-list)
+    (if (= (length grade-list) 0)
+      0
+      (/ (apply + grade-list) (length grade-list)))))
 
 (display "Alice's grades, viewed by Alice: ")
 (print-alice-grades "Alice")
 
 (display "Alice's grades, viewed by Bob: ")
 (print-alice-grades "Bob")
+
+(display "Class average grade, viewed by Alice: ")
+(print-average-grade "Alice")
