@@ -16,7 +16,7 @@
 
 (define make-policy
   (lambda (player-name)
-    (let-label l (lambda (x) (equal? x player-name)) l)))
+    (let-label l (lambda (x) (or (equal? x player-name) (equal? x "professor"))) l)))
 
 ;(struct student (name policy grade-list))
 
@@ -51,8 +51,8 @@
 ; How do I implement this?
 (define print-average-grade
   (lambda (arg)
-    (let ([alice-grade (compute-grade (obs alice-policy arg alice-grades))]
-	  [bob-grade (compute-grade (obs bob-policy arg bob-grades))])
+    (let ([alice-grade (compute-grade (obs alice-policy "professor" alice-grades))]
+	  [bob-grade (compute-grade (obs bob-policy "professor" bob-grades))])
       (displayln (/ (+ alice-grade bob-grade) 2)))))
 
 (define compute-grade 
