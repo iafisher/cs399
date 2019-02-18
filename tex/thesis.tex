@@ -1,0 +1,36 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+
+\bibliographystyle{acm}
+
+\title{CS399 Thesis Draft 1}
+\author{Ian Fisher}
+\date{25 February 2019}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This thesis reviews abstract interpretation as a technique for analyzing programs that use faceted execution, a programming language mechanism for enforcing privacy policies.
+
+\section{Background}
+\subsection{Faceted execution}
+Faceted execution is a programming-language mechanism that allows sensitive data to be enclosed in special data structures called facets---tuples of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. $v_H$ can only be accessed by observers that match the facet's label; other observers can only see $v_L$, which is typically some default value like $0$ or \texttt{null}.
+
+Faceted execution allows privacy policies to be expressed separately from the implementation of the program, meaning that changes to the privacy policy can be made reliably with minimal modification of the application logic. Faceted execution is thus an implementation of policy-agnostic programming \cite{faceted}.
+
+The \textsc{Racets} programming language is an extension of Racket that incorporates faceted execution \cite{racets}. \textsc{Racets} uses the Racket macro system to facilitate the use of facets with Racket code written without special consideration for faceted values. An advantage of this approach is that functions can be written to operate on facets without any logic specific to faceted execution: the \textsc{Racets} macros re-write function applications to ensure that the return value of a function applied to facets is itself a facet. For example, if the function \textit{square-root} were applied to the facet $\langle l \ ?\ 42 : 0 \rangle$, it would return the facet $\langle l \ ?\ \textit{square-root}(42) : \textit{square-root}(0) \rangle$, ensuring that the faceted value remains protected by the privacy policy, even if \textit{square-root} is totally oblivious to the policy.
+
+As the example with \textit{square-root} indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
+
+\subsection{Abstract interpretation}
+One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}.
+
+An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}. My research will draw upon both the \textsc{Racets} language and this related abstract interpreter. It will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time. My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
+
+\section{A sample faceted-execution program}
+
+\bibliography{thesis}
+
+\end{document}
