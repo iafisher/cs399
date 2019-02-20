@@ -14,32 +14,19 @@
 ; facets.rkt from https://github.com/fordsec/racets
 #lang reader "racets.rkt"
 
-(define make-policy
-  (lambda (player-name)
-    (let-label l (lambda (x) (or (equal? x player-name) (equal? x "professor"))) l)))
-
-;(struct student (name policy grade-list))
-
-;(define student-with-policy
-;    (lambda (name grade-list)
-;      (let ([policy (make-policy name)])
-;	(student name policy (fac policy grade-list '())))))
-
-; Some hard-coded data
-;(define alice (student-with-policy "Alice" '(93 84 87)))
-;(define bob (student-with-policy "Bob" '(84 71 73)))
-;(define students (list alice bob))
-;(define alice-policy (make-policy "Alice"))
-;(define bob-policy (make-policy "Bob"))
-
-;(define alice-grades (fac alice-policy '(93 84 87) '()))
-;(define bob-grades (fac bob-policy '(84 71 73) '()))
-
+;;; Global "database" ;;;
 
 (define student-names '())
 (define student-grades '())
 (define student-policies '())
 
+
+(define make-policy
+  (lambda (player-name)
+    (let-label l (lambda (x) (or (equal? x player-name) (equal? x "professor"))) l)))
+
+(define open-policy
+  (let-label l (lambda (x) (not (equal? x "stranger"))) l))
 
 (define add-student
   (lambda (name grades)
@@ -63,49 +50,38 @@
 		(reveal-grades-rec grade-list (cdr policy-list) arg))))])
     (lambda (arg) (reveal-grades-rec student-grades student-policies arg))))
 
+(define (fetch-class-average)
+  (let* ([grades (reveal-grades "professor")]
+	[total (foldr + 0 (map compute-grade grades))])
+    (fac open-policy (/ total (length grades)) 0)))
 
 ; Fetch the faceted grade list for the given student.
-(define fetch-grade
-  (lambda (name)
-    (let ([index (index-of student-names name)])
-      (if index
-	(fac
-	  (list-ref student-policies index)
-	  (list-ref (reveal-grades "professor") index)
-	  '())
-	'()))))
+(define (fetch-grade name)
+  (let ([index (index-of student-names name)])
+    (if index
+      (fac
+	(list-ref student-policies index)
+	(list-ref (reveal-grades "professor") index)
+	'())
+      '())))
+
+(define (compute-grade grade-list)
+  (if (= (length grade-list) 0)
+    0
+    (/ (apply + grade-list) (length grade-list))))
 
 
-; Helper function courtesy of https://stackoverflow.com/questions/15871042/
-(define (index-of lst elem)
-  (let loop ((lst lst)
-	     (idx 0))
-    (cond ((empty? lst) #f)
-	  ((equal? (car lst) elem) idx)
-	  (else (loop (cdr lst) (add1 idx))))))
+;;; The mock API endpoints. ;;;
+; The first argument identifies the entity requesting the
+; action, while the second argument identifies the target of the action.
 
+(define (print-grade observer name)
+  (let ([policy (list-ref student-policies (index-of student-names name))])
+    (displayln (obs policy observer (fetch-grade name)))))
 
-; How do I implement this?
-(define print-average-grade
-  (lambda (student-id)
-    0))
-;(let ([alice-grade (compute-grade (obs alice-policy "professor" alice-grades))]
-;  [bob-grade (compute-grade (obs bob-policy "professor" bob-grades))])
-;     (displayln (/ (+ alice-grade bob-grade) 2)))))
+(define (print-class-average observer)
+  (displayln (obs open-policy observer (fetch-class-average))))
 
-(define compute-grade
-  (lambda (grade-list)
-    (if (= (length grade-list) 0)
-      0
-      (/ (apply + grade-list) (length grade-list)))))
-
-
-; The mock API endpoints. The first argument identifies the entity requesting the
-; action.
-(define print-grade
-  (lambda (observer name)
-    (let ([policy (list-ref student-policies (index-of student-names name))])
-      (displayln (obs policy observer (fetch-grade name))))))
 
 
 ; Populate the student database. Note that add-student prepends students to the
@@ -113,8 +89,16 @@
 (add-student "Alice" '(93 84 87))
 (add-student "Bob" '(84 71 73))
 
-
 ; Some sample API calls.
+(display "Alice's grades, observed by Alice: ")
 (print-grade "Alice" "Alice")
+(display "Alice's grades, observed by the professor: ")
 (print-grade "professor" "Alice")
+(display "Alice's grades, observed by Bob: ")
 (print-grade "Bob" "Alice")
+(display "\n")
+
+(display "Class average, observed by Alice: ")
+(print-class-average "Alice")
+(display "Class average, observed by a stranger: ")
+(print-class-average "stranger")
