@@ -41,21 +41,49 @@
 (define student-policies '())
 
 
-(define add-student 
+(define add-student
   (lambda (name grades)
-    (let ([policy (make-policy name)]) 
-      (begin 
-	(set! student-names (cons name student-names)) 
+    (let ([policy (make-policy name)])
+      (begin
+	(set! student-names (cons name student-names))
 	(set! student-grades (cons (fac policy grades '()) student-grades))
 	(set! student-policies (cons policy student-policies))))))
 
 
-(define print-grades
-  (lambda (student-id)
-    (displayln 
-      (obs (list-ref student-policies student-id)
-	   (list-ref student-names student-id)
-	   (list-ref student-grades student-id)))))
+; Fetch the unprotected grades of everyone in the class.
+; This function is not privacy safe!
+(define reveal-grades
+  (letrec ([reveal-grades-rec
+	  (lambda (grade-list policy-list arg)
+	    (if (empty? policy-list)
+	      grade-list
+	      (obs
+		(car policy-list)
+		arg
+		(reveal-grades-rec grade-list (cdr policy-list) arg))))])
+    (lambda (arg) (reveal-grades-rec student-grades student-policies arg))))
+
+
+; Fetch the faceted grade list for the given student.
+(define fetch-grade
+  (lambda (name)
+    (let ([index (index-of student-names name)])
+      (if index
+	(fac
+	  (list-ref student-policies index)
+	  (list-ref (reveal-grades "professor") index)
+	  '())
+	'()))))
+
+
+; Helper function courtesy of https://stackoverflow.com/questions/15871042/
+(define (index-of lst elem)
+  (let loop ((lst lst)
+	     (idx 0))
+    (cond ((empty? lst) #f)
+	  ((equal? (car lst) elem) idx)
+	  (else (loop (cdr lst) (add1 idx))))))
+
 
 ; How do I implement this?
 (define print-average-grade
@@ -65,32 +93,28 @@
 ;  [bob-grade (compute-grade (obs bob-policy "professor" bob-grades))])
 ;     (displayln (/ (+ alice-grade bob-grade) 2)))))
 
-(define compute-grade 
+(define compute-grade
   (lambda (grade-list)
     (if (= (length grade-list) 0)
       0
       (/ (apply + grade-list) (length grade-list)))))
 
 
+; The mock API endpoints. The first argument identifies the entity requesting the
+; action.
+(define print-grade
+  (lambda (observer name)
+    (let ([policy (list-ref student-policies (index-of student-names name))])
+      (displayln (obs policy observer (fetch-grade name))))))
+
+
 ; Populate the student database. Note that add-student prepends students to the
 ; list, so that Alice will have ID 1 and Bob will have ID 0.
 (add-student "Alice" '(93 84 87))
-;(add-student "Bob" '(84 71 73))
-
-;(displayln (list-ref student-policies 0))
-;(displayln (list-ref student-names 0))
-;(displayln (list-ref student-grades 0))
-(displayln student-grades)
-;(displayln (obs (list-ref student-policies 0) "professor" student-grades))
-
-#|
-(display "Alice's grades: ")
-(print-grades 1)
-
-(display "Bob's grades: ")
-(print-grades 0)
-|#
+(add-student "Bob" '(84 71 73))
 
 
-;(display "Class average grade, viewed by Alice: ")
-;(print-average-grade "Alice")
+; Some sample API calls.
+(print-grade "Alice" "Alice")
+(print-grade "professor" "Alice")
+(print-grade "Bob" "Alice")
