@@ -29,31 +29,41 @@
 ;(define alice (student-with-policy "Alice" '(93 84 87)))
 ;(define bob (student-with-policy "Bob" '(84 71 73)))
 ;(define students (list alice bob))
-(define alice-policy (make-policy "Alice"))
-(define bob-policy (make-policy "Bob"))
+;(define alice-policy (make-policy "Alice"))
+;(define bob-policy (make-policy "Bob"))
 
-(define alice-grades (fac alice-policy '(93 84 87) '()))
-(define bob-grades (fac bob-policy '(84 71 73) '()))
+;(define alice-grades (fac alice-policy '(93 84 87) '()))
+;(define bob-grades (fac bob-policy '(84 71 73) '()))
 
 
-;(define print-grades
-;  (lambda (arg student)
-;    (displayln (obs (student-policy student) arg (student-grade-list student)))))
+(define student-names '())
+(define student-grades '())
+(define student-policies '())
 
-(define print-alice-grades
-  (lambda (arg)
-    (displayln (obs alice-policy arg alice-grades))))
 
-(define print-bob-grades
-  (lambda (arg)
-    (displayln (obs bob-policy arg bob-grades))))
+(define add-student 
+  (lambda (name grades)
+    (let ([policy (make-policy name)]) 
+      (begin 
+	(set! student-names (cons name student-names)) 
+	(set! student-grades (cons (fac policy grades '()) student-grades))
+	(set! student-policies (cons policy student-policies))))))
+
+
+(define print-grades
+  (lambda (student-id)
+    (displayln 
+      (obs (list-ref student-policies student-id)
+	   (list-ref student-names student-id)
+	   (list-ref student-grades student-id)))))
 
 ; How do I implement this?
 (define print-average-grade
-  (lambda (arg)
-    (let ([alice-grade (compute-grade (obs alice-policy "professor" alice-grades))]
-	  [bob-grade (compute-grade (obs bob-policy "professor" bob-grades))])
-      (displayln (/ (+ alice-grade bob-grade) 2)))))
+  (lambda (student-id)
+    0))
+;(let ([alice-grade (compute-grade (obs alice-policy "professor" alice-grades))]
+;  [bob-grade (compute-grade (obs bob-policy "professor" bob-grades))])
+;     (displayln (/ (+ alice-grade bob-grade) 2)))))
 
 (define compute-grade 
   (lambda (grade-list)
@@ -61,11 +71,26 @@
       0
       (/ (apply + grade-list) (length grade-list)))))
 
-(display "Alice's grades, viewed by Alice: ")
-(print-alice-grades "Alice")
 
-(display "Alice's grades, viewed by Bob: ")
-(print-alice-grades "Bob")
+; Populate the student database. Note that add-student prepends students to the
+; list, so that Alice will have ID 1 and Bob will have ID 0.
+(add-student "Alice" '(93 84 87))
+;(add-student "Bob" '(84 71 73))
 
-(display "Class average grade, viewed by Alice: ")
-(print-average-grade "Alice")
+;(displayln (list-ref student-policies 0))
+;(displayln (list-ref student-names 0))
+;(displayln (list-ref student-grades 0))
+(displayln student-grades)
+;(displayln (obs (list-ref student-policies 0) "professor" student-grades))
+
+#|
+(display "Alice's grades: ")
+(print-grades 1)
+
+(display "Bob's grades: ")
+(print-grades 0)
+|#
+
+
+;(display "Class average grade, viewed by Alice: ")
+;(print-average-grade "Alice")
