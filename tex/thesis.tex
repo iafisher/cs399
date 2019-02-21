@@ -5,7 +5,8 @@
 
 \lstset{
 	language=Lisp,
-	numbers=left
+	numbers=left,
+	showstringspaces=false,
 }
 
 \bibliographystyle{acm}
@@ -35,6 +36,7 @@ The following subsections will present an overview of the specific mechanics of 
 \subsubsection{A simple example of faceted execution}
 Policies governing access to data are declared with the \texttt{let-label} form in \textsc{Racets}:
 
+% TODO: Double quotes do not display correctly.
 \begin{lstlisting}
 (define alice-policy
     (let-label l (lambda (x) (equal? x "Alice")) l))
@@ -73,6 +75,34 @@ The policy passed to a facet must match the policy that the facet was created wi
 \end{lstlisting}
 
 \subsubsection{An example of nested facets}
+Faceted values may be nested for more fine-grained control over the views of the data that are available. Alice may define a nested facet as follows:
+
+\begin{lstlisting}
+(define location-facet 
+  (fac alice-policy 
+    "370 Lancaster Ave, Haverford PA"
+    (fac bob-policy
+      "Haverford, PA"
+      "Pennsylvania")))
+\end{lstlisting}
+
+Alice is able to view the full street address of her location. Bob (or anyone else satisfying Bob's policy) may see her town, and anyone else may only see her state.
+
+Alice observes her nested facet in the usual way:
+
+\begin{lstlisting}
+(obs alice-policy "Alice" location-facet)
+\end{lstlisting}
+
+Bob must make two calls to \texttt{obs} to fully resolve the facet's value:
+
+\begin{lstlisting}
+(obs alice-policy "Bob" (obs bob-policy "Bob" location-facet))
+\end{lstlisting}
+
+As before, Bob must ensure that the policy he passes to each \texttt{obs} call matches the policy of the facet. In this case, the outer facet uses Alice's policy and the inner facet uses Bob's policy, so the calls to \texttt{obs} must be organized likewise.
+
+\subsubsection{An example of faceted lists}
 TODO
 
 \subsubsection{Efficiency of faceted execution}
@@ -82,9 +112,7 @@ A practical problem of implementing faceted execution is that it can have high r
 \subsection{Abstract interpretation}
 One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}.
 
-An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}. My research will draw upon both the \textsc{Racets} language and this related abstract interpreter. It will involve writing several substantial example programs (one of which is presented in section \ref{sec:program}) that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time. My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
-
-\section{A sample faceted-execution program\label{sec:program}}
+An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}. My research will draw upon both the \textsc{Racets} language and this related abstract interpreter. It will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time. My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
 
 \bibliography{thesis}
 
