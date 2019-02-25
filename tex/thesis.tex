@@ -185,6 +185,52 @@ The definition of a type system is ``a tractable syntactic method for proving th
 
 Naturally, some undesirable program behaviors cannot be detected by a static type system (e.g., looping infinitely is not detectable due to the halting problem), and type systems will sometimes refuse to accept constructs which are in fact safe.
 
+A simple model of a static type system is the typed lambda-calculus. The following exposition is based on chapter 9 of \cite{types}.
+
+The lambda calculus is a simple model of calculation in which the only operation is function application. Syntactically the lambda calculus has three kinds of terms: variables ($x$, $y$, etc.), anonymous functions, also known as abstractions ($\lambda x . x$), and function applications ($t\ t$). The notation $\lambda x . x$ is equivalent to the more traditional notation of $f(x) = x$, except that it has the advantage of not requiring the function to be named. Function application of the form $t_1\ t_2$ is equivalent notationally to $t_1(t_2)$. The body of a lambda function may contain any of the three syntactic forms of the language, so for example $\lambda x . \lambda y . (\lambda z . z)(x)$ is a valid term in the lambda calculus whose outermost abstraction contains another abstraction, which in turn contains an application. For clarity, the application is written with parentheses.
+
+A type system for the lambda calculus (and indeed for any programming language) must assign a type to each syntactic construction in the language.
+
+The typed lambda calculus has the same syntax as the untyped lambda calculus, except that a type annotation is necessary for lambda abstractions, which are now written as $\lambda x: T . x$ instead of $\lambda x. x$, where $T$ is a type.
+
+Type rules are commonly written in the form
+
+\[
+\frac{\text{hypotheses}}
+{\text{conclusion}}
+\]
+
+where \textit{hypotheses} is a set of assumptions and \textit{conclusion} is a type judgment that follows from the hypotheses.
+
+The rule for the types of variables is\footnote{The type rules are taken from Figure 9-1 on p. 103 of \cite{types}.}
+
+\[
+\frac{x : T \in \Gamma}
+{\Gamma \vdash x : T}
+\]
+
+$\Gamma$ stands for an assignment function that maps from a finite number of variable names to their values. The notation $\Gamma \vdash t : T$ expresses the three-place typing relation that syntactic term $t$ has type $T$ given the assignment $\Gamma$. The type rule for variables simply states that if a variable is paired with a certain type $T$ in the assignment function, then $T$ is the variable's type.
+
+The rule for lambda abstraction is a bit more complicated:
+
+\[
+\frac{\Gamma, x : T_1 \vdash t_2 : T_2}
+{\Gamma \vdash \lambda x : T_1 . t_2 : T_1 \to T_2}
+\]
+
+In the hypothesis $\Gamma, x : T_1$ should be read as ``$\Gamma$ augmented with the assignment of type $T_1$ to $x$.'' It is assumed that the variable $x$ is not already in $\Gamma$; if it is, it can simply be renamed. The full hypothesis of the abstraction rule thus states that the body of the lambda function has type $T_2$ with the given assignment function. The conclusion of the abstraction rule states that the lambda function as a whole has the complex type $T_1 \to T_2$.
+
+Finally, the last syntactic form of the language, application, has the type rule
+
+\[
+\frac{\Gamma \vdash t_1 : T_{11} \to T_{12}\ \ \ \ \ \ \Gamma \vdash t_2 : T_{11}}
+{\Gamma \vdash t_1\ t_2 : T_{12}}
+\]
+
+Given that the function has type $T_{11} \to T_{12}$ in $\Gamma$, and the argument has type $T_{11}$, then the expression as a whole has type $T_{12}$.
+
+The three inference rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically eliminate a class of errors from the simple lambda calculus. Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
+
 \section{Research plan}
 My research will proceed in two directions: abstract interpretation and type theory. On the abstract interpretation side of things, it will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time.
 
