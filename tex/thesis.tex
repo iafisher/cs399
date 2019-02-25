@@ -22,7 +22,7 @@
 This thesis reviews abstract interpretation as a technique for analyzing programs that use faceted execution, a programming language mechanism for enforcing privacy policies. It presents an overview of faceted execution and abstract interpretation, and analyzes in-depth a sample program that uses faceted execution.
 
 \section{Background}
-\subsection{Faceted execution}
+\subsection{Faceted execution\label{sec:facets}}
 Faceted execution is a programming-language mechanism that allows sensitive data to be enclosed in special data structures called facets---tuples of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. $v_H$ can only be accessed by observers that match the facet's label; other observers can only see $v_L$, which is typically some default value like $0$ or \texttt{null}.
 
 Faceted execution allows privacy policies to be expressed separately from the implementation of the program, meaning that changes to the privacy policy can be made reliably with minimal modification of the application logic. Faceted execution is thus an implementation of policy-agnostic programming \cite{faceted}.
@@ -234,7 +234,9 @@ The three inference rules presented above can be applied to any expression in th
 \section{Research plan}
 My research will proceed in two directions: abstract interpretation and type theory. On the abstract interpretation side of things, it will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time.
 
-My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
+The other part of my research will consist in writing a formal type system for the \textsc{Racets} programming language. As noted in section \ref{sec:facets}, correct use of faceted execution requires that the programmer take care to always match a faceted value with its corresponding policy in calls to \texttt{obs}. A type system that could determine whether a policy corresponds with a facet or not would be able to statically prove whether any call to \texttt{obs} results in a grounded (i.e., non-faceted) value or not---a useful result for checking the correctness of the program.
+
+My research will aid in understanding the efficacy of static analysis and type theory as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
 
 \bibliography{thesis}
 
