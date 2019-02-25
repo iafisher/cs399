@@ -141,7 +141,10 @@ The following procedure observes the entire list of grades into a regular Racket
       (obs
         (car policy-list)
         arg
-        (reveal-grades-rec grade-list (cdr policy-list) arg))))])
+        (reveal-grades-rec
+          grade-list
+          (cdr policy-list)
+          arg))))])
 \end{lstlisting}
 
 It takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
@@ -149,11 +152,20 @@ It takes in a list of grades, a list of policies which should correspond index-b
 \subsubsection{Efficiency of faceted execution}
 A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \textit{square-root} above indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
 
-
 \subsection{Abstract interpretation}
-One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}.
+One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}. An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}.
 
-An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}. My research will draw upon both the \textsc{Racets} language and this related abstract interpreter. It will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time. My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
+\subsection{Type theory}
+As the example \textsc{Racets} programs presented above indicated, programmers must be careful to apply the correct policies when they observe faceted values. As the \textsc{Racets} language is dynamically typed, errors in the use of faceted execution are not caught until runtime. A static type system for faceted values would be able to more reliably catch programmer errors.
+
+The definition of a type system is ``a tractable syntactic method for proving the absence of certain program behaviors by classifying phrases according to the kinds of values they compute'' \cite{types}. The program behaviors that a type system are meant to prevent are generally what are called type errors: operations on values for which the operation is not defined.
+
+Naturally, some undesirable program behaviors cannot be detected by a static type system (e.g., looping infinitely is not detectable due to the halting problem), and type systems will sometimes refuse to accept constructs which are in fact safe.
+
+\section{Research plan}
+My research will proceed in two directions: abstract interpretation and type theory. On the abstract interpretation side of things, it will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time.
+
+My research will aid in understanding the efficacy of static analysis as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
 
 \bibliography{thesis}
 
