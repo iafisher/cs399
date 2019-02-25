@@ -102,15 +102,38 @@ Bob must make two calls to \texttt{obs} to fully resolve the facet's value:
 
 As before, Bob must ensure that the policy he passes to each \texttt{obs} call matches the policy of the facet. In this case, the outer facet uses Alice's policy and the inner facet uses Bob's policy, so the calls to \texttt{obs} must be organized likewise.
 
+\subsubsection{An example of faceted structs}
+The behavior of faceted values with Racket structs is consistent but somewhat counterintuitive. Take the following example:
+
+\begin{lstlisting}
+(struct emplyoyee (name position salary))
+(define bob 
+  (employee "Bob" "manager" (fac bob-policy 70000 0)))
+\end{lstlisting}
+
+The call to the \texttt{employee} constructor is handled by \textsc{Racets} the way that any function call is: by branching execution on both values on the facet. Therefore, the return value is \texttt{(fac bob-policy (employee "Bob" "manager" 70000) (employee "Bob" "manager" 0))}. Bob's faceted salary can thus be accessed like so:
+
+\begin{lstlisting}
+; Equivalent:
+(employee-salary (obs bob-policy "Bob" bob))
+(obs bob-policy "Bob" (employee-salary bob))
+\end{lstlisting}
+
+Somewhat surprisingly, \texttt{obs} is required to observe the name field (and any other field) of the \texttt{employee} object, even though it was not explicitly faceted in the constructor.
+
+\begin{lstlisting}
+(employee-name (obs bob-policy "Bob" bob))
+\end{lstlisting}
+
 \subsubsection{An example of faceted lists}
-Using faceted values with data structures involves additional complications. Consider the following example:
+Using faceted values with lists involves additional complications. Consider the following example:
 
 \begin{lstlisting}
 (define grades (list))
 (set! grades (cons (fac alice-policy 84 0) grades))
 \end{lstlisting}
 
-The programmer likely intended for \texttt{grades} to be of the form \texttt{(list (fac alice-policy 84 0))}, i.e. a regular list containing a single facet. However, the rules of faceted execution with regard to function application apply to \texttt{cons} just like any other function: functions applied to faceted values yield faceted return values. The real value of \texttt{grades} after the \texttt{set!} operation is
+As in the example with structs, the programmer likely intended for \texttt{grades} to be of the form \texttt{(list (fac alice-policy 84 0))}, i.e. a regular list containing a single facet. The real value of \texttt{grades} after the \texttt{set!} operation is
 
 \begin{lstlisting}
 (fac alice-policy (list 84) (list 0))
