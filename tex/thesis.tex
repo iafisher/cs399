@@ -1,7 +1,9 @@
 \documentclass{article}
 
 \usepackage{amsmath}
+\usepackage{hyperref}
 \usepackage{listings}
+\usepackage{verbatim}
 
 \lstset{
 	language=Lisp,
@@ -19,7 +21,7 @@
 \maketitle
 
 \section{Introduction}
-This thesis reviews abstract interpretation as a technique for analyzing programs that use faceted execution, a programming language mechanism for enforcing privacy policies. It presents an overview of faceted execution and abstract interpretation, and analyzes in-depth a sample program that uses faceted execution.
+This thesis draft reviews faceted execution, a programming language mechanism for enforcing privacy policies. The application of abstract interpretation and type theory to faceted execution is discussed, and a number of example programs that demonstrate the use of faceted execution are presented and explained.
 
 \section{Background}
 \subsection{Faceted execution\label{sec:facets}}
@@ -189,11 +191,9 @@ A simple model of a static type system is the typed lambda-calculus. The followi
 
 The lambda calculus is a simple model of calculation in which the only operation is function application. Syntactically the lambda calculus has three kinds of terms: variables ($x$, $y$, etc.), anonymous functions, also known as abstractions ($\lambda x . x$), and function applications ($t\ t$). The notation $\lambda x . x$ is equivalent to the more traditional notation of $f(x) = x$, except that it has the advantage of not requiring the function to be named. Function application of the form $t_1\ t_2$ is equivalent notationally to $t_1(t_2)$. The body of a lambda function may contain any of the three syntactic forms of the language, so for example $\lambda x . \lambda y . (\lambda z . z)(x)$ is a valid term in the lambda calculus whose outermost abstraction contains another abstraction, which in turn contains an application. For clarity, the application is written with parentheses.
 
-A type system for the lambda calculus (and indeed for any programming language) must assign a type to each syntactic construction in the language.
+The typed lambda calculus has the same syntax as the untyped lambda calculus, except that a type annotation is necessary for lambda abstractions, which are now written as $\lambda x: T . x$ instead of $\lambda x. x$, where $T$ is a type. The $: T$ syntax is an example of a \textit{type annotation}---an annotation supplied by the programmer that indicates the expected type of a variable or expression. Not all languages require type annotations, but they are often beneficial for clarity and simplicity of implementation.
 
-The typed lambda calculus has the same syntax as the untyped lambda calculus, except that a type annotation is necessary for lambda abstractions, which are now written as $\lambda x: T . x$ instead of $\lambda x. x$, where $T$ is a type.
-
-Type rules are commonly written in the form
+A type system for the lambda calculus (and indeed for any programming language) must assign a type to each syntactic construction in the language. Typically this requirement is satisfied by supplying a type rule for each syntactic expression in the language. Type rules are commonly written in the form
 
 \[
 \frac{\text{hypotheses}}
@@ -229,12 +229,16 @@ Finally, the last syntactic form of the language, application, has the type rule
 
 Given that the function has type $T_{11} \to T_{12}$ in $\Gamma$, and the argument has type $T_{11}$, then the expression as a whole has type $T_{12}$.
 
-The three inference rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically eliminate a class of errors from the simple lambda calculus. Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
+The three inference rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically eliminate a class of errors from the simple lambda calculus.
+
+Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
 
 \section{Research plan}
 My research will proceed in two directions: abstract interpretation and type theory. On the abstract interpretation side of things, it will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time.
 
 The other part of my research will consist in writing a formal type system for the \textsc{Racets} programming language. As noted in section \ref{sec:facets}, correct use of faceted execution requires that the programmer take care to always match a faceted value with its corresponding policy in calls to \texttt{obs}. A type system that could determine whether a policy corresponds with a facet or not would be able to statically prove whether any call to \texttt{obs} results in a grounded (i.e., non-faceted) value or not---a useful result for checking the correctness of the program.
+
+\textsc{Racets} is a dynamically-typed language (as is its base language, Racket), so any type system that I develop would take the form of a mathematical formalism rather than a concrete implementation, though an actual implementation of it would be possible using Typed Racket, a statically typed variant of Racket \cite{typed-racket}.
 
 My research will aid in understanding the efficacy of static analysis and type theory as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
 
