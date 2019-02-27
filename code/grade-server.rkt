@@ -1,14 +1,12 @@
 ; A prototype grade server that demonstrates the use of faceted execution.
 ;
-; An individual user of the grade server may have one of three roles: professor, TA, or
-; student.
+; An individual user of the grade server may have one of three roles: professor, student or
+; stranger (i.e., someone who is not logged in).
 ;
-; Each student has a list of assignments with a numeric grade and optionally comments
-; from the grader.
-;
-; Professors may see the grades of every student for all assignments. TAs may see the
-; grades of every student, but only for the last assignment. Students may only see their
-; own individual grades, but they may see the average grade of everyone in the class.
+; Each student has a list of assignments with a numeric grade. Professors may see the 
+; grades of every student for all assignments. Students may only see their own individual 
+; grades, but they may see the average grade of everyone in the class. Strangers may not
+; access any information.
 
 ; In order to run this module, you need to copy racets.rkt, racets-mlang.rkt, and
 ; facets.rkt from https://github.com/fordsec/racets
