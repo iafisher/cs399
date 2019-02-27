@@ -9,7 +9,8 @@
 ; access any information.
 
 ; In order to run this module, you need to copy racets.rkt, racets-mlang.rkt, and
-; facets.rkt from https://github.com/fordsec/racets
+; facets.rkt from https://github.com/fordsec/racets, and place them in the same
+; directory as this file.
 #lang reader "racets.rkt"
 
 
