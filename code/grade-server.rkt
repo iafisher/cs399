@@ -31,7 +31,8 @@
 
 ; Fetch the unprotected grades of everyone in the class.
 ; This function is not privacy safe!
-(define reveal-grades
+(define (reveal-grades arg)
+  ; Define a recursive helper function.
   (letrec ([reveal-grades-rec
 	  (lambda (grade-list policy-list arg)
 	    (if (empty? policy-list)
@@ -40,7 +41,7 @@
 		(car policy-list)
 		arg
 		(reveal-grades-rec grade-list (cdr policy-list) arg))))])
-    (lambda (arg) (reveal-grades-rec student-grades student-policies arg))))
+    (reveal-grades-rec student-grades student-policies arg)))
 
 ; Fetch the faceted class average value.
 (define (fetch-class-average)
