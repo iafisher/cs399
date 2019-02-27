@@ -14,28 +14,20 @@
 ; facets.rkt from https://github.com/fordsec/racets
 #lang reader "racets.rkt"
 
-;;; Global "database" ;;;
 
+;;; Global "database" ;;;
 (define student-names '())
 (define student-grades '())
 (define student-policies '())
 
 
-(define make-policy
-  (lambda (player-name)
-    (let-label l (lambda (x) (or (equal? x player-name) (equal? x "professor"))) l)))
+; Make a policy for a particular student.
+(define (make-policy student-name)
+  (let-label l (lambda (x) (or (equal? x student-name) (equal? x "professor"))) l))
 
+; The open policy allows access to anyone who is logged in.
 (define open-policy
   (let-label l (lambda (x) (not (equal? x "stranger"))) l))
-
-(define add-student
-  (lambda (name grades)
-    (let ([policy (make-policy name)])
-      (begin
-	(set! student-names (cons name student-names))
-	(set! student-grades (cons (fac policy grades '()) student-grades))
-	(set! student-policies (cons policy student-policies))))))
-
 
 ; Fetch the unprotected grades of everyone in the class.
 ; This function is not privacy safe!
@@ -50,6 +42,7 @@
 		(reveal-grades-rec grade-list (cdr policy-list) arg))))])
     (lambda (arg) (reveal-grades-rec student-grades student-policies arg))))
 
+; Fetch the faceted class average value.
 (define (fetch-class-average)
   (let* ([grades (reveal-grades "professor")]
 	[total (foldr + 0 (map compute-grade grades))])
@@ -65,6 +58,7 @@
 	'())
       '())))
 
+; Given a student's list of grades, compute their class class.
 (define (compute-grade grade-list)
   (if (= (length grade-list) 0)
     0
@@ -82,6 +76,12 @@
 (define (print-class-average observer)
   (displayln (obs open-policy observer (fetch-class-average))))
 
+(define (add-student name grades)
+  (let ([policy (make-policy name)])
+    (begin
+      (set! student-names (cons name student-names))
+      (set! student-grades (cons (fac policy grades '()) student-grades))
+      (set! student-policies (cons policy student-policies)))))
 
 
 ; Populate the student database. Note that add-student prepends students to the
