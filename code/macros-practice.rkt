@@ -6,6 +6,10 @@
 ;   define-syntax: Whenever the symbol is encountered, apply the syntax
 ;   transformation.
 ;
+;   syntax-case: Pattern matching for syntax objects.
+;
+;   define-syntax-rule: Shortcut for defining a macro with pattern matching.
+;
 ;   syntax->datum: Recursively convert a syntax object to an S-expression.
 ;
 ;   syntax-e: Convert the top level of a syntax object to an S-expression.
@@ -63,3 +67,26 @@ expand-to-string  ; Doesn't have to be in parentheses.
 	     [else false-expr])]))
 
 (my-if-2 #t (displayln "true2") (displayln "false2"))
+
+
+; my-if using define-syntax-rule
+(define-syntax-rule (my-if-3 condition true-expr false-expr)
+  (cond [condition true-expr]
+	[else false-expr]))
+
+(my-if-3 #t (displayln "true3") (displayln "false3"))
+
+
+(define-syntax (hyphen-define stx)
+  (syntax-case stx ()
+    [(_ a b (args ...) body0 body ...)
+     (syntax-case (datum->syntax #'a
+				 (string->symbol (format "~a-~a"
+							 (syntax->datum #'a)
+							 (syntax->datum #'b))))
+       ()
+       [name #'(define (name args ...)
+		 body0 body ...)])]))
+
+(hyphen-define foo bar () #t)
+(foo-bar)
