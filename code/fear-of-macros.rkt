@@ -20,11 +20,11 @@
 
 ; Only racket/base is defined automatically at compile-time, so we have to
 ; specifically request pattern-matching if we want to use it in a macro.
-(require (for-syntax racket/match))
+(require (for-syntax racket/match racket/syntax))
 
 
 ; Ignore the input syntax and always expand to the same string literal.
-(define-syntax (expand-to-string stx) 
+(define-syntax (expand-to-string stx)
   ; #'x is short for (syntax x).
   #'"I am an expanded macro!")
 
@@ -35,12 +35,12 @@ expand-to-string  ; Doesn't have to be in parentheses.
 
 ; Reverse the arguments.
 (define-syntax (reverse-syntax stx)
-  (datum->syntax 
+  (datum->syntax
     ; The first argument contains the lexical content information that is
     ; associated with the output syntax. Can be #f to associate no lexical
     ; content.
-    stx 
-    (reverse 
+    stx
+    (reverse
       ; cdr because the first element of the S-expression is the name of the
       ; macro, "reverse-syntax".
       (cdr (syntax->datum stx)))))
@@ -52,7 +52,6 @@ expand-to-string  ; Doesn't have to be in parentheses.
 (define-syntax (my-if stx)
   (match (syntax->list stx)
     [(list name condition true-expr false-expr)
-     ; I don't fully understand how this avoids evaluating the false case.
      (datum->syntax stx `(cond [,condition ,true-expr]
 			       [else ,false-expr]))]))
 
@@ -90,3 +89,45 @@ expand-to-string  ; Doesn't have to be in parentheses.
 
 (hyphen-define foo bar () #t)
 (foo-bar)
+
+
+; hyphen-define rewritten to use format-id and with-syntax
+(define-syntax (hyphen-define-2 stx)
+  (syntax-case stx ()
+    [(_ a b (args ...) body0 body ...)
+     (with-syntax ([name (format-id #'a "~a-~a" #'a #'b)])
+       #'(define (name args ...)
+	   body0 body ...))]))
+
+(hyphen-define-2 foo bar-2 () #t)
+(foo-bar-2)
+
+
+; Redefinition of (a simplified version of) the standard struct macro
+(define-syntax (our-struct stx)
+    (syntax-case stx ()
+      [(_ id (fields ...))
+       (with-syntax ([pred-id (format-id #'id "~a?" #'id)])
+         #`(begin
+             ; Define a constructor.
+             (define (id fields ...)
+               (apply vector (cons 'id  (list fields ...))))
+
+             ; Define a predicate.
+             (define (pred-id v)
+               (and (vector? v)
+                    (eq? (vector-ref v 0) 'id)))
+
+             ; Define an accessor for each field.
+             #,@(for/list ([x (syntax->list #'(fields ...))]
+                           [n (in-naturals 1)])
+                  (with-syntax ([acc-id (format-id #'id "~a-~a" #'id x)]
+                                [ix n])
+                    #`(define (acc-id v)
+                        (unless (pred-id v)
+                          (error 'acc-id "~a is not a ~a struct" v 'id))
+                        (vector-ref v ix))))))]))
+
+(our-struct test-struct (a b))
+(define s (test-struct 42 666))
+(test-struct-a s)
