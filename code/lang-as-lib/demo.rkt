@@ -3,4 +3,4 @@
 (displayln "Inside demo.rkt")
 
 (define x 10)
-(+ x 2)
+(displayln (+ x 2))
