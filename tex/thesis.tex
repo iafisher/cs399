@@ -42,6 +42,8 @@
 
 \tableofcontents
 
+
+
 \section{Background}
 \subsection{Faceted execution\label{sec:facets}}
 Faceted execution is a programming-language mechanism that allows sensitive data to be enclosed in special data structures called facets---tuples of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. $v_H$ can only be accessed by observers that match the facet's label; other observers can only see $v_L$, which is typically some default value like $0$ or \texttt{null}.
@@ -197,12 +199,16 @@ Syntactic macros are a mechanism by which the source syntax of a program can be 
 
 TODO: Finish.
 
+
+
 \section{Abstract interpretation}
 A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \textit{square-root} above indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
 
 One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}. An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}.
 
 TODO: More details about the abstracting abstract machines approach.
+
+
 
 \section{Type theory}
 As the example \textsc{Racets} programs presented above indicated, programmers must be careful to apply the correct policies when they observe faceted values. As the \textsc{Racets} language is dynamically typed, errors in the use of faceted execution are not caught until runtime. A static type system for faceted values would be able to more reliably catch programmer errors.
@@ -257,6 +263,8 @@ The three inference rules presented above can be applied to any expression in th
 
 Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
 
+
+
 \section{Extending Racket with faceted execution}
 Racket provides several ways to extend its syntax and semantics. The current implementation of Racets (Racket with facets) uses syntactic macros. A more flexible and powerful approach using Racket's \texttt{\#lang} will also be presented.
 
@@ -273,6 +281,7 @@ The language-as-a-library approach \cite{typed-racket} uses \texttt{\#lang} to i
 
 The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}.
 
+\subsubsection{Small example of a language-as-a-library}
 The following minimal but complete example of the languages-as-libraries idea prints out the fully-expanded abstract syntax tree of a program before running it normally:
 
 \begin{lstlisting}
@@ -308,10 +317,70 @@ The language file begins with the standard \texttt{\#lang racket} declaration, s
 
 where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object. The macro then outputs a \texttt{\#\%plain-module-begin} form (rather than a \texttt{\#\%module-begin}, to avoid infinite recursion) that wraps the original source syntax, after a call to \texttt{displayln} that prints at run-time the actual syntax object that was generated at compile-time.
 
+\subsubsection{Larger example of a language-as-a-library}
+As a proof-of-concept of implementing Racets with the language-as-a-library approach, this section presents a library called \texttt{wrap-ident.rkt} that rewrites identifiers in the source code so that the text of the identifier is printed out whenever it is evaluated. For example, running the module below would generate the output \texttt{Dereferencing x  Dereferencing y}.
 
+\begin{lstlisting}
+#lang s-exp "wrap-ident.rkt"
+
+(define x 10)
+(define y 32)
+(displayln (+ x y))
+\end{lstlisting}
+
+The \texttt{wrap-ident.rkt} defines two helper functions, \texttt{transform-syntax} and \texttt{wrap-variable}, which together transform the AST in the prescribed manner. Since these functions are used by a macro (but are not themselves macros), they must be wrapped in a \texttt{begin-for-syntax} block:
+
+\begin{lstlisting}
+\#lang racket
+
+(require (for-syntax racket/match))
+
+(begin-for-syntax
+  (define (wrap-variable v)
+    (let ([vstr (symbol->string v)])
+      (quasiquote
+        (begin
+          (display "Dereferencing ") (displayln ,vstr) ,v))))
+
+  (define (transform-syntax datum)
+    (match datum
+      [(list '\#\%app f xs ...)
+        (cons
+          f
+          (map
+            (lambda (x)
+              (if (symbol? x)
+                (wrap-variable x)
+                (transform-syntax x)))
+            xs))]
+      [(list xs ...) (map transform-syntax xs)]
+      [default default])))
+\end{lstlisting}
+
+\texttt{(wrap-variable p)} evaluates to \texttt{(begin (display "Dereferencing) (displayln "p") p)}. \texttt{transform-syntax} recursively traverses the AST and rewrites symbols using \texttt{wrap-variable}. In the implementation above, only function applications (represented by the \texttt{\#\%app} base form in fully-expanded Racket) have their identifiers re-written. A full implementation of this language would have a separate case for each of the base forms in fully-expanded Racket that could potentially take an identifier argument.
+
+The final piece is the whole-module rewrite rule:
+
+\begin{lstlisting}
+(define-syntax (module-begin stx)
+  (syntax-case stx ()
+    [(_ forms ...)
+      (let ([as-datum
+              (syntax->datum
+                (local-expand
+                  #'(#%plain-module-begin forms ...)
+                  'module-begin
+                  '()))])
+        (datum->syntax stx (transform-syntax as-datum)))]))
+
+(provide (except-out (all-from-out racket) #%module-begin)
+         (rename-out [module-begin #%module-begin]))
+\end{lstlisting}
+
+The \texttt{module-begin} macro invokes \texttt{local-expand} on the module contents, and then converts the syntax object into a list using \texttt{syntax->datum}. The \texttt{transform-syntax} function is invoked on the list, and the result is converted back to a syntax object.
 
 \section{Conclusion}
-TODO
+This thesis has identified three areas in which writing code with faceted values faces difficulties: faceted code is slower than non-faceted code, it is easy to make avoidable mistakes when using the \texttt{obs} form, and present implementations of faceted execution have trouble integrating smoothly with external (i.e., non-faceted) code. I have reviewed potential solutions for each of these problems: static analysis by abstract interpretation to reduce runtime overhead, static typing to catch programmer errors, and Racket's \texttt{\#lang} mechanism to ease compatibility with non-faceted code. Additionally, I have shown how the present implementation of Racets could be re-written using \texttt{\#lang}. The techniques and theory reviewed in this thesis should contribute to making writing code with faceted execution more ergonomic, and thus indirectly to safeguarding the privacy of software users.
 
 \begin{comment}
 \section{Research plan}

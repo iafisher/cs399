@@ -5,7 +5,7 @@
 (begin-for-syntax
   (define (wrap-variable v)
     (let ([vstr (symbol->string v)])
-      `((lambda (x) (begin (display "Dereferencing ") (displayln ,vstr) x)) ,v)))
+      `(begin (display "Dereferencing ") (displayln ,vstr) ,v)))
 
   (define (transform-syntax datum)
     (match datum
