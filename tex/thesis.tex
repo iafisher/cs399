@@ -1,7 +1,7 @@
 \documentclass{article}
 
 \usepackage{amsmath}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{listings}
 \usepackage{verbatim}
 
@@ -20,8 +20,11 @@
 \begin{document}
 \maketitle
 
-\section{Introduction}
-This thesis draft reviews faceted execution, a programming language mechanism for enforcing privacy policies. The application of abstract interpretation and type theory to faceted execution is discussed, and a number of example programs that demonstrate the use of faceted execution are presented and explained.
+\begin{abstract}
+	This thesis draft reviews faceted execution, a programming language mechanism for enforcing privacy policies. I discuss several issues with the use of faceted execution in actual software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism), and I present a prototype implementation of an extension to the existing Racets system \cite{racets} that integrates faceted execution into the Racket programming language.
+\end{abstract}
+
+\tableofcontents
 
 \section{Background}
 \subsection{Faceted execution\label{sec:facets}}
@@ -174,6 +177,11 @@ The following procedure observes the entire list of grades into a regular Racket
 
 It takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
 
+\subsection{Syntactic macros}
+Syntactic macros are a mechanism by which the source syntax of a program can be transformed prior to execution. They are a more powerful cousin of the lexical macros familiar to C and C++ programmers. Racket, like most dialects of Lisp, includes a particularly powerful macro system. This section will briefly introduce the concept of syntactic macros in Racket. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive overview.
+
+TODO: Finish.
+
 \section{Abstract interpretation}
 A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \textit{square-root} above indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
 
@@ -232,7 +240,11 @@ The three inference rules presented above can be applied to any expression in th
 
 Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
 
-\section{Implementing Racets as a \texttt{\#lang} language}
+\section{Extending the Racket language with faceted execution}
+\subsection{Current Racets: Racket extended with syntactic macros}
+TODO
+
+\subsection{Future Racets: Racket extended using \texttt{\#lang}}
 TODO
 
 \section{Conclusion}
