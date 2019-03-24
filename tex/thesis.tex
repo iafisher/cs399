@@ -14,14 +14,14 @@
 \lstset{
 	aboveskip=3mm,
 	belowskip=3mm,
-	basicstyle={\ttfamily},
+	basicstyle={\large\ttfamily},
 	columns=flexible,
 	frame=tb,
 	language=Lisp,
 	numbers=left,
 	showstringspaces=false,
 	% Style copied from https://stackoverflow.com/questions/3175105/
-	numberstyle=\small\color{gray},
+	numberstyle=\normalsize\color{gray},
 	keywordstyle=\color{blue},
 	commentstyle=\color{dkgreen},
 	stringstyle=\color{mauve},
@@ -202,6 +202,8 @@ A practical problem of implementing faceted execution is that it can have high r
 
 One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}. An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}.
 
+TODO: More details about the abstracting abstract machines approach.
+
 \section{Type theory}
 As the example \textsc{Racets} programs presented above indicated, programmers must be careful to apply the correct policies when they observe faceted values. As the \textsc{Racets} language is dynamically typed, errors in the use of faceted execution are not caught until runtime. A static type system for faceted values would be able to more reliably catch programmer errors.
 
@@ -269,7 +271,6 @@ Source files in Racket typically begin with a \texttt{\#lang racket} declaration
 
 The language-as-a-library approach \cite{typed-racket} uses \texttt{\#lang} to implement new domain-specific languages which are typically compatible with Racket code and which are much easier to write than a new language from scratch, since they can make use of all the facilities exposed by the Racket compiler.
 
-% TODO: Bib entry for FE Racket looks terrible
 The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}.
 
 The following minimal but complete example of the languages-as-libraries idea prints out the fully-expanded abstract syntax tree of a program before running it normally:
@@ -305,9 +306,9 @@ The language file begins with the standard \texttt{\#lang racket} declaration, s
     core-forms ...))]))
 \end{lstlisting}
 
-where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object.
+where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object. The macro then outputs a \texttt{\#\%plain-module-begin} form (rather than a \texttt{\#\%module-begin}, to avoid infinite recursion) that wraps the original source syntax, after a call to \texttt{displayln} that prints at run-time the actual syntax object that was generated at compile-time.
 
-TODO: Finish.
+
 
 \section{Conclusion}
 TODO
@@ -324,6 +325,7 @@ My research will aid in understanding the efficacy of static analysis and type t
 
 \end{comment}
 
+% TODO: Bib entry for FE Racket looks terrible
 \bibliography{thesis}
 
 \end{document}
