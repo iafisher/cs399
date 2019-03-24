@@ -1,6 +1,7 @@
-#lang s-exp "wrapv.rkt"
+#lang s-exp "racets.rkt"
 
 (displayln "Inside demo.rkt")
 
 (define x 10)
-(displayln (+ x 2))
+(define y 32)
+(displayln (+ x y))
