@@ -1,14 +1,30 @@
 \documentclass{article}
 
 \usepackage{amsmath}
+\usepackage{color}
 \usepackage[hidelinks]{hyperref}
 \usepackage{listings}
 \usepackage{verbatim}
 
+% Colors copied from https://stackoverflow.com/questions/3175105/
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
 \lstset{
+	aboveskip=3mm,
+	belowskip=3mm,
+	basicstyle={\ttfamily},
+	columns=flexible,
+	frame=tb,
 	language=Lisp,
 	numbers=left,
 	showstringspaces=false,
+	% Style copied from https://stackoverflow.com/questions/3175105/
+	numberstyle=\small\color{gray},
+	keywordstyle=\color{blue},
+	commentstyle=\color{dkgreen},
+	stringstyle=\color{mauve},
 }
 
 \bibliographystyle{acm}
@@ -41,13 +57,12 @@ The following subsections will present an overview of the specific mechanics of 
 \subsubsection{A simple example of faceted execution}
 Policies governing access to data are declared with the \texttt{let-label} form in \textsc{Racets}:
 
-% TODO: Double quotes do not display correctly.
 \begin{lstlisting}
 (define alice-policy
-    (let-label l (lambda (x) (equal? x "Alice")) l))
+  (let-label l (lambda (x) (equal? x "Alice")) l))
 
 (define bob-policy
-    (let-label l (lambda (x) (equal? x "Bob")) l))
+  (let-label l (lambda (x) (equal? x "Bob")) l))
 \end{lstlisting}
 
 The two declarations in the source code above create two policies and bind them to the names \texttt{alice-policy} and \texttt{bob-policy}. The policies enforce that only entities identifying themselves as ``Alice'' or ``Bob'', respectively, may view the high-confidentiality value of any facet under the policies.
@@ -165,14 +180,14 @@ The following procedure observes the entire list of grades into a regular Racket
 \begin{lstlisting}
 (define (reveal-grades-rec grade-list policy-list arg)
   (if (empty? policy-list)
-      grade-list
-      (obs
-        (car policy-list)
-        arg
-        (reveal-grades-rec
-          grade-list
-          (cdr policy-list)
-          arg))))])
+    grade-list
+    (obs
+      (car policy-list)
+      arg
+      (reveal-grades-rec
+        grade-list
+        (cdr policy-list)
+        arg))))])
 \end{lstlisting}
 
 It takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
@@ -240,12 +255,59 @@ The three inference rules presented above can be applied to any expression in th
 
 Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
 
-\section{Extending the Racket language with faceted execution}
-\subsection{Current Racets: Racket extended with syntactic macros}
+\section{Extending Racket with faceted execution}
+Racket provides several ways to extend its syntax and semantics. The current implementation of Racets (Racket with facets) uses syntactic macros. A more flexible and powerful approach using Racket's \texttt{\#lang} will also be presented.
+
+\subsection{Racets with macros}
 TODO
 
-\subsection{Future Racets: Racket extended using \texttt{\#lang}}
-TODO
+\subsubsection{Shortcomings}
+Implementing Racets using macros suffers from two shortcomings: it is not possible to transform bare variable references, and the Racets macros may interfere with user-defined or third-party macros. These shortcomings can be averted with Racet's \texttt{\#lang} mechanism.
+
+\subsection{Racets as a language-as-a-library}
+Source files in Racket typically begin with a \texttt{\#lang racket} declaration. However, other languages may be defined (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}) which reuse some of the syntax and semantics of Racket and modify other parts of it, down to the level of lexical structure.
+
+The language-as-a-library approach \cite{typed-racket} uses \texttt{\#lang} to implement new domain-specific languages which are typically compatible with Racket code and which are much easier to write than a new language from scratch, since they can make use of all the facilities exposed by the Racket compiler.
+
+% TODO: Bib entry for FE Racket looks terrible
+The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}.
+
+The following minimal but complete example of the languages-as-libraries idea prints out the fully-expanded abstract syntax tree of a program before running it normally:
+
+\begin{lstlisting}
+#lang racket
+
+; Fully expands the module and prints out its abstract syntax
+; tree, before running it normally.
+(define-syntax (module-begin stx)
+  (syntax-case stx ()
+    [(_ forms ...)
+    (with-syntax ([(_ core-forms ...)
+                   (local-expand
+                     #'(#%plain-module-begin forms ...)
+                     'module-begin
+                     '())])
+      #'(#%plain-module-begin
+          (displayln '(core-forms ...))
+          core-forms ...))]))
+
+(provide (except-out (all-from-out racket) #%module-begin)
+  (rename-out [module-begin #%module-begin]))
+\end{lstlisting}
+
+If this program were saved in a file called \texttt{racket/print-ast.rkt}, then other files could be written in the language by beginning with \texttt{\#lang s-exp "racket/print-ast.rkt"} instead of \texttt{\#lang racket}.
+
+The language file begins with the standard \texttt{\#lang racket} declaration, since the file itself is written in Racket. It then defines a macro called \texttt{module-begin} which rewrites its syntax object to be
+
+\begin{lstlisting}
+#'(#%plain-module-begin
+    (displayln '(core-forms ...))
+    core-forms ...))]))
+\end{lstlisting}
+
+where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object.
+
+TODO: Finish.
 
 \section{Conclusion}
 TODO
