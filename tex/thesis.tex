@@ -4,6 +4,8 @@
 \usepackage{color}
 \usepackage[hidelinks]{hyperref}
 \usepackage{listings}
+\usepackage{tikz}
+\usepackage{tikz-qtree}
 \usepackage{verbatim}
 
 % Colors copied from https://stackoverflow.com/questions/3175105/
@@ -18,7 +20,6 @@
 	columns=flexible,
 	frame=tb,
 	language=Lisp,
-	numbers=left,
 	showstringspaces=false,
 	% Style copied from https://stackoverflow.com/questions/3175105/
 	numberstyle=\normalsize\color{gray},
@@ -37,7 +38,7 @@
 \maketitle
 
 \begin{abstract}
-	This thesis draft reviews faceted execution, a programming language mechanism for enforcing privacy policies. I discuss several issues with the use of faceted execution in actual software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism), and I present a prototype implementation of an extension to the existing Racets system \cite{racets} that integrates faceted execution into the Racket programming language.
+	This thesis draft reviews faceted execution, a programming-language mechanism for enforcing privacy policies. I discuss several issues that could hinder the use of faceted execution in actual software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism). I present a prototype implementation of an extension to the existing \textsc{Racets} system \cite{racets} that integrates faceted execution into the Racket programming language.
 \end{abstract}
 
 \tableofcontents
@@ -46,18 +47,18 @@
 
 \section{Background}
 \subsection{Faceted execution\label{sec:facets}}
-Faceted execution is a programming-language mechanism that allows sensitive data to be enclosed in special data structures called facets---tuples of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. $v_H$ can only be accessed by observers that match the facet's label; other observers can only see $v_L$, which is typically some default value like $0$ or \texttt{null}.
+Faceted execution is a programming-language mechanism that allows sensitive data to be enclosed in special data structures called facets---tuples of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. $v_H$ can only be accessed by observers that match the facet's label; other observers can only see $v_L$, which is typically a default value like $0$ or \texttt{null}.
 
 Faceted execution allows privacy policies to be expressed separately from the implementation of the program, meaning that changes to the privacy policy can be made reliably with minimal modification of the application logic. Faceted execution is thus an implementation of policy-agnostic programming \cite{faceted}.
 
-Full support of faceted execution requires changes to core language mechanisms like function application. Concretely, if the function \textit{square-root} were applied to the facet $\langle l \ ?\ 42 : 0 \rangle$, it would return the facet $\langle l \ ?\ \textit{square-root}(42) : \textit{square-root}(0) \rangle$, ensuring that the faceted value remains protected by the privacy policy, even if \textit{square-root} is totally oblivious to the policy.
+Full support of faceted execution requires changes to core language mechanisms like function application. Concretely, if the function \texttt{square-root} were applied to the facet $\langle l \ ?\ 42 : 0 \rangle$, it must return the facet $\langle l \ ?\ \texttt{square-root}(42) : \texttt{square-root}(0) \rangle$, ensuring that the faceted value remains protected by the privacy policy, even if \texttt{square-root} is totally oblivious to the policy. Without changes to the mechanics of function application, a privacy-agnostic version of \texttt{square-root} would either choke on faceted input, inadvertently reveal sensitive data, or both.
 
 Researchers have adopted different strategies to implement faceted execution. One strategy is to design a new programming language with faceted-execution primitives built-in. This is the strategy adopted by the Jeeves programming language \cite{jeeves}. Another strategy is to use syntactic macros to graft faceted execution on to an existing language, provided that the language's macro system is rich enough to support it. The \textsc{Racets} programming language adopts the latter strategy, by augmenting the Racket language with syntactic macros \cite{racets}.
 
-The following subsections will present an overview of the specific mechanics of the \textsc{Racets} programming language, but the concepts are general enough to apply to other implementations of faceted execution.
+The following subsections will present an overview of the mechanics of faceted execution specific to the \textsc{Racets} programming language, but the concepts are general enough to apply to other implementations of faceted execution.
 
 \subsubsection{A simple example of faceted execution}
-Policies governing access to data are declared with the \texttt{let-label} form in \textsc{Racets}:
+Policies, which govern access to sensitive data, are declared with the \texttt{let-label} form in \textsc{Racets}:
 
 \begin{lstlisting}
 (define alice-policy
@@ -67,7 +68,7 @@ Policies governing access to data are declared with the \texttt{let-label} form 
   (let-label l (lambda (x) (equal? x "Bob")) l))
 \end{lstlisting}
 
-The two declarations in the source code above create two policies and bind them to the names \texttt{alice-policy} and \texttt{bob-policy}. The policies enforce that only entities identifying themselves as ``Alice'' or ``Bob'', respectively, may view the high-confidentiality value of any facet under the policies.
+The two declarations in the source code above create two policies and bind them to the names \texttt{alice-policy} and \texttt{bob-policy}. The policies enforce that only entities identifying themselves as ``Alice'' or ``Bob'', respectively, may view the high-confidentiality value of any facet protected by the policies.
 
 A faceted data value is created with the \texttt{fac} form:
 
@@ -89,12 +90,14 @@ The expression above will evaluate to $42$, as the argument \texttt{"Alice"} sat
 (obs alice-policy "Bob" my-facet)
 \end{lstlisting}
 
-The policy passed to a facet must match the policy that the facet was created with. In the case that the facets do not match, \texttt{obs} functions as a no-op (so that the semantics are sound). Each of the two calls to \texttt{obs} below, for instance, will simply return \texttt{my-facet} unchanged.
+The policy passed to a facet must match the policy that the facet was created with. In the case that the facets do not match, \texttt{obs} functions as a no-op. Each of the two calls to \texttt{obs} below, for instance, will simply return \texttt{my-facet} unchanged.
 
 \begin{lstlisting}
 (obs bob-policy "Alice" my-facet)
 (obs bob-policy "Bob" my-facet)
 \end{lstlisting}
+
+The forms \texttt{let-label}, \texttt{fac}, and \texttt{obs} comprise the primitive operations of faceted execution in \textsc{Racets}.
 
 \subsubsection{An example of nested facets}
 Faceted values may be nested for more fine-grained control over the views of the data that are available. Alice may define a nested facet as follows:
@@ -108,7 +111,20 @@ Faceted values may be nested for more fine-grained control over the views of the
       "Pennsylvania")))
 \end{lstlisting}
 
-Alice is able to view the full street address of her location. Bob (or anyone else satisfying Bob's policy) may see her town, and anyone else may only see her state.
+Alice is able to view the full street address of her location. Bob (or anyone else satisfying Bob's policy) may see her town, and anyone else may only see her state. The structure of the nested facet may be visualized as a tree, where the right branches are the high-confidentiality values, the left branches are the low-confidentiality values, the leaves are the non-faceted values, and the internal nodes are the policies:
+
+\begin{center}
+	\begin{tikzpicture}
+	\Tree
+	[.\texttt{alice-policy}
+		\texttt{"370 Lancaster Ave, Haverford PA"}
+		[.\texttt{bob-policy}
+			\texttt{"Haverford, PA"}
+			\texttt{"Pennsylvania"}
+		]
+	]
+	\end{tikzpicture}
+\end{center}
 
 Alice observes her nested facet in the usual way:
 
@@ -133,11 +149,11 @@ The behavior of faceted values with Racket structs is consistent but somewhat co
   (employee "Bob" "manager" (fac bob-policy 70000 0)))
 \end{lstlisting}
 
-The call to the \texttt{employee} constructor is handled by \textsc{Racets} the way that any function call is: by branching execution on both values on the facet. Therefore, the return value is \texttt{(fac bob-policy (employee "Bob" "manager" 70000) (employee "Bob" "manager" 0))}. Bob's faceted salary can thus be accessed like so:
+The call to the \texttt{employee} constructor is handled by \textsc{Racets} the way that any function call is: by branching execution on both values on the facet. Therefore, the return value is \texttt{(fac bob-policy (employee "Bob" "manager" 70000) (employee "Bob" "manager" 0))}, i.e. a facet that wraps two different instantiations of the \texttt{employee} struct. Bob's faceted salary can be accessed like so:
 
 \begin{lstlisting}
-; Equivalent:
 (employee-salary (obs bob-policy "Bob" bob))
+; or, equivalently:
 (obs bob-policy "Bob" (employee-salary bob))
 \end{lstlisting}
 
@@ -155,7 +171,7 @@ Using faceted values with lists involves additional complications. Consider the 
 (set! grades (cons (fac alice-policy 84 0) grades))
 \end{lstlisting}
 
-As in the example with structs, the programmer likely intended for \texttt{grades} to be of the form \texttt{(list (fac alice-policy 84 0))}, i.e. a regular list containing a single facet. The real value of \texttt{grades} after the \texttt{set!} operation is
+As in the example with structs, the programmer likely intended for \texttt{grades} to be of the form \texttt{(list (fac alice-policy 84 0))}, i.e. a regular list containing a single facet. However, the real value of \texttt{grades} after the \texttt{set!} operation is
 
 \begin{lstlisting}
 (fac alice-policy (list 84) (list 0))
@@ -194,10 +210,12 @@ The following procedure observes the entire list of grades into a regular Racket
 
 It takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
 
-\subsection{Syntactic macros}
-Syntactic macros are a mechanism by which the source syntax of a program can be transformed prior to execution. They are a more powerful cousin of the lexical macros familiar to C and C++ programmers. Racket, like most dialects of Lisp, includes a particularly powerful macro system. This section will briefly introduce the concept of syntactic macros in Racket. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive overview.
+This section and the previous one have illustrated fundamental issues with the interaction of faceted execution and data structures, stemming from the generic treatment of faceted function application. For the sake of programming ergonomics, future implementations of faceted execution may wish to not treat functional application quite so generically, to allow structure-creating forms like \texttt{list} and struct constructors to be special cases that behave more intuitively with faceted arguments.
 
-Macros implement a compile-time transformation of source syntax. A macro takes a syntax object as input and outputs another syntax object. Macros are defined in Racket with the \texttt{define-syntax} form. The macro \texttt{identity} below simply returns its input syntax unchanged.
+\subsection{Syntactic macros}
+Syntactic macros are a mechanism by which the source syntax of a program is transformed prior to execution. They are a more powerful cousin of the lexical macros familiar to C and C++ programmers. Racket, like most dialects of Lisp, includes a particularly powerful syntactic macro system. This section will briefly introduce the Racket macro system. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive overview.
+
+A macro is defined like a function that takes a syntax object as input and outputs another syntax object, except the definition uses \texttt{define-syntax} instead of \texttt{define}. The simplest possible macro simply returns its input syntax unchanged:
 
 \begin{lstlisting}
 (define-syntax (identity stx)
@@ -207,10 +225,11 @@ Macros implement a compile-time transformation of source syntax. A macro takes a
 A macro is invoked just like a regular function:
 
 \begin{lstlisting}
+; Expands to just x
 (identity x)
 \end{lstlisting}
 
-New syntax can be constructed with the \texttt{syntax} function or its abbreviation, \texttt{\#'}:
+New syntax objects can be constructed with the \texttt{syntax} function or its abbreviation, \texttt{\#'}:
 
 \begin{lstlisting}
 (define-syntax (ignore-input stx)
@@ -245,7 +264,7 @@ A programmer could use the \texttt{reverse-syntax} macro as follows:
          ,(syntax-source stx)))))
 \end{lstlisting}
 
-\texttt{syntax-case} allows macros to pattern-match on syntax objects:
+More complicated macros can be written with the pattern-matching facilities of \texttt{syntax-case}. The following macro uses \texttt{syntax-case} to behave differently if it invoked with one argument or two:
 
 \begin{lstlisting}
 (define-syntax (one-or-two stx)
@@ -258,13 +277,7 @@ A programmer could use the \texttt{reverse-syntax} macro as follows:
 
 In the snippet above, each identifier in the \texttt{syntax-case} clause matches a single top-level expression (which may be an atomic value or a compound structure like a list). The underscore matches the name of the macro itself, and the symbols \texttt{a} and \texttt{b} match arguments to the macro.
 
-One final point about syntactic macros in Racket is that they are hygienic, meaning that variables introduced in the macro are protected from conflicting with variables in the original source code. By contrast, macros in C are not hygienic, so in \texttt{swap} below, the \texttt{tmp} variable defined in the macro will interfere with unrelated uses of \texttt{tmp} in the same scope as the macro invocation.
-
-\begin{lstlisting}[language=C]
-#define swap(x, y) int tmp = x; x = y; y = tmp;
-\end{lstlisting}
-
-Consider the following macro in Racket:
+One final point about syntactic macros in Racket is that they are hygienic, meaning that identifiers introduced in the macro are protected from conflicting with identifiers in the original source code. Consider the following macro in Racket:
 
 \begin{lstlisting}
 (define-syntax (hygienic stx)
@@ -288,45 +301,51 @@ then one might expect that it would expand to
 (let ([x 10] (+ x x)))
 \end{lstlisting}
 
-which should evaluate to 20. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
+which would (counterintuitively) evaluate to 20. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
 
 \begin{lstlisting}
-; Correct
+; Correct -- x in the macro is rewritten as x:3
 (define x 32)
 (let ([x:3]) (+ x x:3))
 \end{lstlisting}
 
 At runtime the expanded macro thus correctly evaluates to 42.
 
-Hygienic syntactic macros are a powerful feature of the Racket language that will be leveraged to implement faceted execution in a seamless manner that would not be possible in a language that did not expose a rich set of mechanisms for language extension.
+By contrast, macros in C are not hygienic, so in \texttt{swap} below, the \texttt{tmp} variable defined in the macro will interfere with unrelated uses of \texttt{tmp} in the same scope as the macro invocation.
+
+\begin{lstlisting}[language=C]
+#define swap(x, y) int tmp = x; x = y; y = tmp;
+\end{lstlisting}
+
+Hygienic syntactic macros are a powerful feature of the Racket language that will be leveraged in section \ref{sec:lang} to implement faceted execution in a seamless manner that would not be possible in a language that did not expose a rich set of mechanisms for language extension.
 
 
 
 \section{Abstract interpretation}
-A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \textit{square-root} above indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
+A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \texttt{square-root} in section \ref{sec:facets} indicated, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
 
 One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}. An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}.
 
-The level of detail that the abstract interpreter can attain with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower static analysis and a more complex abstract interpreter.
+The level of detail that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
 
 TODO: More details about the abstracting abstract machines approach.
 
 
 
 \section{Type theory}
-As the example \textsc{Racets} programs presented above indicated, programmers must be careful to apply the correct policies when they observe faceted values. As the \textsc{Racets} language is dynamically typed, errors in the use of faceted execution are not caught until runtime. A static type system for faceted values would be able to more reliably catch programmer errors.
+Programmers must be careful to apply the correct policies when they observe faceted values. Since the \textsc{Racets} language is dynamically typed, errors in the use of faceted execution are not caught until runtime. A static type system for faceted values would be able to more reliably catch programmer errors.
 
-The definition of a type system is ``a tractable syntactic method for proving the absence of certain program behaviors by classifying phrases according to the kinds of values they compute'' \cite{types}. The program behaviors that a type system are meant to prevent are generally what are called type errors: operations on values for which the operation is not defined.
+The definition of a type system is ``a tractable syntactic method for proving the absence of certain program behaviors by classifying phrases according to the kinds of values they compute'' \cite{types}. The program behaviors that a type system are meant to prevent are generally what are called type errors: attempted operations on values for which the operation is not defined.
 
-Naturally, some undesirable program behaviors cannot be detected by a static type system (e.g., looping infinitely is not detectable due to the halting problem), and type systems will sometimes refuse to accept constructs which are in fact safe.
+Naturally, some undesirable program behaviors cannot be detected by a static type system (e.g., looping infinitely is not detectable due to the uncomputability of the halting problem), and type systems will sometimes refuse to accept constructs which are in fact safe. Nonetheless, a well-designed type system is an effective tool for catching programmer errors.
 
 A simple model of a static type system is the typed lambda-calculus. The following exposition is based on chapter 9 of \cite{types}.
 
-The lambda calculus is a simple model of calculation in which the only operation is function application. Syntactically the lambda calculus has three kinds of terms: variables ($x$, $y$, etc.), anonymous functions, also known as abstractions ($\lambda x . x$), and function applications ($t\ t$). The notation $\lambda x . x$ is equivalent to the more traditional notation of $f(x) = x$, except that it has the advantage of not requiring the function to be named. Function application of the form $t_1\ t_2$ is equivalent notationally to $t_1(t_2)$. The body of a lambda function may contain any of the three syntactic forms of the language, so for example $\lambda x . \lambda y . (\lambda z . z)(x)$ is a valid term in the lambda calculus whose outermost abstraction contains another abstraction, which in turn contains an application. For clarity, the application is written with parentheses.
+The lambda calculus is a simple model of calculation in which the only data type is the function and the only operation is function application. Syntactically the lambda calculus has three kinds of terms: variables ($x$, $y$, etc.), anonymous functions, also known as abstractions ($\lambda x . x$), and function applications ($t\ t$). The notation $\lambda x . x$ is equivalent to the more traditional notation of $f(x) = x$, except that it has the advantage of not requiring the function to be named. Function application of the form $t_1\ t_2$ is equivalent notationally to $t_1(t_2)$. The body of a lambda function may contain any of the three syntactic forms of the language, so for example $\lambda x . \lambda y . (\lambda z . z)(x)$ is a valid term in the lambda calculus whose outermost abstraction contains another abstraction, which in turn contains an application. For clarity, the application is written with parentheses.
 
-The typed lambda calculus has the same syntax as the untyped lambda calculus, except that a type annotation is necessary for lambda abstractions, which are now written as $\lambda x: T . x$ instead of $\lambda x. x$, where $T$ is a type. The $: T$ syntax is an example of a \textit{type annotation}---an annotation supplied by the programmer that indicates the expected type of a variable or expression. Not all languages require type annotations, but they are often beneficial for clarity and simplicity of implementation.
+The typed lambda calculus has the same syntax as the untyped lambda calculus, except that a type annotation is necessary for lambda abstractions, which are now written as $\lambda x: T . x$ instead of $\lambda x. x$, where $T$ is a type. The $: T$ syntax is an example of a \textit{type annotation}---an annotation supplied by the programmer that indicates the intended type of a variable or expression. Not all languages require type annotations, but they are often beneficial for clarity and simplicity of implementation.
 
-A type system for the lambda calculus (and indeed for any programming language) must assign a type to each syntactic construction in the language. Typically this requirement is satisfied by supplying a type rule for each syntactic expression in the language. Type rules are commonly written in the form
+A type system for the lambda calculus (and indeed for any programming language) must assign a type to each syntactic construction in the language. These assignments are formally known as type rules. Type rules are written in the form
 
 \[
 \frac{\text{hypotheses}}
@@ -362,17 +381,17 @@ Finally, the last syntactic form of the language, application, has the type rule
 
 Given that the function has type $T_{11} \to T_{12}$ in $\Gamma$, and the argument has type $T_{11}$, then the expression as a whole has type $T_{12}$.
 
-The three inference rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically eliminate a class of errors from the simple lambda calculus.
+The three type rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically eliminate a class of errors from the simple lambda calculus.
 
 Type systems for real programming languages are significantly more complex, but involve the same basic formalism of inference rules and type judgments.
 
 
 
-\section{Extending Racket with faceted execution}
-Racket provides several ways to extend its syntax and semantics. The current implementation of Racets (Racket with facets) uses syntactic macros. A more flexible and powerful approach using Racket's \texttt{\#lang} will also be presented.
+\section{Extending Racket with faceted execution\label{sec:lang}}
+Racket provides several ways to extend its syntax and semantics. The current implementation of \textsc{Racets} uses syntactic macros. A more flexible and powerful approach using Racket's \texttt{\#lang} will also be presented.
 
 \subsection{Racets with macros}
-At present, the Racets system is implemented as a set of syntactic macros in Racket. The macros redefine core Racket constructs like \texttt{lambda}, \texttt{if}, and \texttt{\#\%app} (function application) to make them sensitive to faceted values. For example, the \texttt{lambda} form is transformed by the Racets \texttt{fac-lambda} macro, which wraps the resulting function in a special data structure.
+At present, the \textsc{Racets} system is implemented as a set of syntactic macros in Racket. The macros redefine core Racket constructs like \texttt{lambda}, \texttt{if}, and \texttt{\#\%app} (function application) to make them sensitive to faceted values. For example, the \texttt{lambda} form is transformed by the \texttt{fac-lambda} macro, which wraps the resulting function in a special data structure.
 
 \begin{lstlisting}
 (define-syntax (fac-lambda stx)
@@ -381,17 +400,19 @@ At present, the Racets system is implemented as a set of syntactic macros in Rac
       \#`(fclo (lambda xs expr))]))
 \end{lstlisting}
 
-\subsubsection{Shortcomings}
-Implementing Racets using macros suffers from two shortcomings: it is not possible to transform bare identifiers, and the Racets macros may interfere with user-defined or third-party macros. These shortcomings can be averted with Racet's \texttt{\#lang} mechanism.
+Other macros are provided for a subset of the core forms of Racket. See \cite{racets} for details of the implementation.
 
-To correctly handle faceted execution, the Racets system needs to wrap (some) identifiers with the \texttt{facet-deref} form. It is simply not possible to achieve this level of transformation with a syntactic macro because identifiers are ``raw'' in the syntax: unlike function applications, lambda definitions, and other Racket constructs, identifiers are not wrapped in an identifier-specific syntactic form at any point in the expansion process, and thus it is impossible for a macro to target identifiers specifically and exclusively.
+\subsubsection{Shortcomings}
+Implementing \textsc{Racets} using macros suffers from two shortcomings: it is not possible to transform bare identifiers, and the \textsc{Racets} macros may interfere with user-defined or third-party macros.
+
+To correctly handle faceted execution, the \textsc{Racets} system needs to wrap (some) identifiers with the \texttt{facet-deref} form. It is simply not possible to achieve this level of transformation with a syntactic macro because identifiers are ``raw'' in the syntax: unlike function applications, lambda definitions, and other Racket constructs, identifiers are not wrapped in an identifier-specific syntactic form at any point in the expansion process, and thus it is impossible for a macro to target identifiers specifically and exclusively.
 
 \subsection{Racets as a language-as-a-library}
-Source files in Racket typically begin with a \texttt{\#lang racket} declaration. However, other languages may be defined (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}) which reuse some of the syntax and semantics of Racket and modify other parts of it, down to the level of lexical structure.
+These shortcomings can be averted with \textsc{Racets}'s \texttt{\#lang} mechanism. Source files in Racket typically begin with a \texttt{\#lang racket} declaration. However, other languages may be defined (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}) which reuse some of the syntax and semantics of Racket and modify other parts of it, down to the level of lexical structure.
 
 The language-as-a-library approach \cite{typed-racket} uses \texttt{\#lang} to implement new domain-specific languages which are typically compatible with Racket code and which are much easier to write than a new language from scratch, since they can make use of all the facilities exposed by the Racket compiler.
 
-The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}.
+The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}. The language designer then need only provide translations for the small set of core forms that constituted Fully-Expanded Racket.
 
 \subsubsection{Small example of a language-as-a-library}
 The following minimal but complete example of the languages-as-libraries idea prints out the fully-expanded abstract syntax tree of a program before running it normally:
@@ -413,6 +434,8 @@ The following minimal but complete example of the languages-as-libraries idea pr
           (displayln '(core-forms ...))
           core-forms ...))]))
 
+; Export everything from the regular Racket language, except
+; replaced #%module-begin with our own implementation.
 (provide (except-out (all-from-out racket) #%module-begin)
   (rename-out [module-begin #%module-begin]))
 \end{lstlisting}
@@ -443,7 +466,7 @@ As a proof-of-concept of implementing Racets with the language-as-a-library appr
 The \texttt{wrap-ident.rkt} defines two helper functions, \texttt{transform-syntax} and \texttt{wrap-variable}, which together transform the AST in the prescribed manner. Since these functions are used by a macro (but are not themselves macros), they must be wrapped in a \texttt{begin-for-syntax} block:
 
 \begin{lstlisting}
-\#lang racket
+#lang racket
 
 (require (for-syntax racket/match))
 
@@ -456,7 +479,7 @@ The \texttt{wrap-ident.rkt} defines two helper functions, \texttt{transform-synt
 
   (define (transform-syntax datum)
     (match datum
-      [(list '\#\%app f xs ...)
+      [(list '#%app f xs ...)
         (cons
           f
           (map
@@ -494,7 +517,7 @@ The \texttt{module-begin} macro invokes \texttt{local-expand} on the module cont
 
 
 \section{Conclusion}
-This thesis has identified three areas in which writing code with faceted values faces difficulties: faceted code is slower than non-faceted code, it is easy to make avoidable mistakes when using the \texttt{obs} form, and present implementations of faceted execution have trouble integrating smoothly with external (i.e., non-faceted) code. I have reviewed potential solutions for each of these problems: static analysis by abstract interpretation to reduce runtime overhead, static typing to catch programmer errors, and Racket's \texttt{\#lang} mechanism to ease compatibility with non-faceted code. Additionally, I have shown how the present implementation of Racets could be re-written using \texttt{\#lang}. The techniques and theory reviewed in this thesis should contribute to making writing code with faceted execution more ergonomic, and thus indirectly to safeguarding the privacy of software users.
+This thesis has identified three areas in which the ergonomics of faceted execution could be improved: faceted code is slower than non-faceted code, it is easy to make avoidable mistakes when using the \texttt{obs} form, and present implementations of faceted execution have trouble integrating smoothly with external (i.e., non-faceted) code. I have reviewed potential solutions for each of these problems: static analysis by abstract interpretation to reduce runtime overhead, static typing to catch programmer errors, and Racket's \texttt{\#lang} mechanism to ease compatibility with non-faceted code. Additionally, I have shown how the present implementation of \textsc{Racets} could be re-written using \texttt{\#lang}. The techniques and theory reviewed in this thesis should contribute to making writing code with faceted execution more ergonomic, and thus indirectly to safeguarding the privacy of software users.
 
 % TODO: Bib entry for FE Racket looks terrible
 \bibliography{thesis}
