@@ -197,7 +197,108 @@ It takes in a list of grades, a list of policies which should correspond index-b
 \subsection{Syntactic macros}
 Syntactic macros are a mechanism by which the source syntax of a program can be transformed prior to execution. They are a more powerful cousin of the lexical macros familiar to C and C++ programmers. Racket, like most dialects of Lisp, includes a particularly powerful macro system. This section will briefly introduce the concept of syntactic macros in Racket. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive overview.
 
-TODO: Finish.
+Macros implement a compile-time transformation of source syntax. A macro takes a syntax object as input and outputs another syntax object. Macros are defined in Racket with the \texttt{define-syntax} form. The macro \texttt{identity} below simply returns its input syntax unchanged.
+
+\begin{lstlisting}
+(define-syntax (identity stx)
+  stx)
+\end{lstlisting}
+
+A macro is invoked just like a regular function:
+
+\begin{lstlisting}
+(identity x)
+\end{lstlisting}
+
+New syntax can be constructed with the \texttt{syntax} function or its abbreviation, \texttt{\#'}:
+
+\begin{lstlisting}
+(define-syntax (ignore-input stx)
+  ; Equivalent to (syntax (displayln "ignoring input"))
+  #'(displayln "ignoring input")
+\end{lstlisting}
+
+Syntax objects can be converted to and from lists. This functionality allows us to implement a macro that reverses its arguments:
+
+\begin{lstlisting}
+(define-syntax (reverse-syntax stx)
+  (datum->syntax stx (reverse (cdr (syntax->datum stx)))))
+\end{lstlisting}
+
+A programmer could use the \texttt{reverse-syntax} macro as follows:
+
+\begin{lstlisting}
+; Expands to (+ 20 22), which evaluates to 42
+(reverse-syntax 20 22 +)
+\end{lstlisting}
+
+\texttt{reverse-syntax} is the first example of a macro that could not be written as a regular Racket function, since it actually effects a transformation of the source syntax. Another example, familiar to users of the C preprocessor, accesses the location information that syntax objects carry to dynamically print the location of the macro invocation in the source code.\footnote{A similar effect can be achieved using the C preprocessor with the \texttt{\_\_LINE\_\_} and \texttt{\_\_FILE\_\_} macros.}
+
+\begin{lstlisting}
+(define-syntax (print-source-location stx)
+  (datum->syntax
+    stx
+    `(displayln
+       (format
+         "line ~a of ~a"
+         ,(syntax-line stx)
+         ,(syntax-source stx)))))
+\end{lstlisting}
+
+\texttt{syntax-case} allows macros to pattern-match on syntax objects:
+
+\begin{lstlisting}
+(define-syntax (one-or-two stx)
+  (syntax-case stx ()
+    [(_ a b)
+     #'(displayln "Got two")]
+    [(_ a)
+     #'(displayln "Got one")]))
+\end{lstlisting}
+
+In the snippet above, each identifier in the \texttt{syntax-case} clause matches a single top-level expression (which may be an atomic value or a compound structure like a list). The underscore matches the name of the macro itself, and the symbols \texttt{a} and \texttt{b} match arguments to the macro.
+
+One final point about syntactic macros in Racket is that they are hygienic, meaning that variables introduced in the macro are protected from conflicting with variables in the original source code. By contrast, macros in C are not hygienic, so in \texttt{swap} below, the \texttt{tmp} variable defined in the macro will interfere with unrelated uses of \texttt{tmp} in the same scope as the macro invocation.
+
+\begin{lstlisting}[language=C]
+#define swap(x, y) int tmp = x; x = y; y = tmp;
+\end{lstlisting}
+
+Consider the following macro in Racket:
+
+\begin{lstlisting}
+(define-syntax (hygienic stx)
+  (syntax-case stx ()
+    [(_ a)
+     #'(let ([x 10]) (+ x a))]))
+\end{lstlisting}
+
+If \texttt{hygienic} was used in a context where another identifier \texttt{x} was defined, e.g.
+
+\begin{lstlisting}
+(define x 32)
+(hygienic x)
+\end{lstlisting}
+
+then one might expect that it would expand to
+
+\begin{lstlisting}
+; Wrong!
+(define x 32)
+(let ([x 10] (+ x x)))
+\end{lstlisting}
+
+which should evaluate to 20. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
+
+\begin{lstlisting}
+; Correct
+(define x 32)
+(let ([x:3]) (+ x x:3))
+\end{lstlisting}
+
+At runtime the expanded macro thus correctly evaluates to 42.
+
+Hygienic syntactic macros are a powerful feature of the Racket language that will be leveraged to implement faceted execution in a seamless manner that would not be possible in a language that did not expose a rich set of mechanisms for language extension.
 
 
 
@@ -205,6 +306,8 @@ TODO: Finish.
 A practical problem of implementing faceted execution is that it can have high runtime cost. As the example with \textit{square-root} above indicates, functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value. The double evaluation imposes a significant runtime cost on faceted execution (as well as complicating the use of functions with side-effects). This cost can be mitigated to some extent by static analysis with an abstract interpreter. If the static analyzer can prove that a facet passed to a function only ever evaluates to its high-confidentiality value, then the evaluation of the function with the low-confidentiality value could be skipped, and significant performance gains could be realized.
 
 One technique for static analysis is abstract interpretation, wherein the computation of a program is modelled with abstract objects (e.g., the abstract ``negative number'' instead of the concrete $-10$) so that real properties of the program can be reasoned about \cite{ai-original}. Abstract interpreters can be derived mechanically from abstract machines, provided that the formalism for the abstract machine is expressed in an amenable manner \cite{aam}. An abstract interpreter of a \textsc{Racets}-like language is under development for this purpose \cite{abstract-inter}.
+
+The level of detail that the abstract interpreter can attain with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower static analysis and a more complex abstract interpreter.
 
 TODO: More details about the abstracting abstract machines approach.
 
@@ -269,10 +372,19 @@ Type systems for real programming languages are significantly more complex, but 
 Racket provides several ways to extend its syntax and semantics. The current implementation of Racets (Racket with facets) uses syntactic macros. A more flexible and powerful approach using Racket's \texttt{\#lang} will also be presented.
 
 \subsection{Racets with macros}
-TODO
+At present, the Racets system is implemented as a set of syntactic macros in Racket. The macros redefine core Racket constructs like \texttt{lambda}, \texttt{if}, and \texttt{\#\%app} (function application) to make them sensitive to faceted values. For example, the \texttt{lambda} form is transformed by the Racets \texttt{fac-lambda} macro, which wraps the resulting function in a special data structure.
+
+\begin{lstlisting}
+(define-syntax (fac-lambda stx)
+  (syntax-parse stx
+    [(\_ xs expr)
+      \#`(fclo (lambda xs expr))]))
+\end{lstlisting}
 
 \subsubsection{Shortcomings}
-Implementing Racets using macros suffers from two shortcomings: it is not possible to transform bare variable references, and the Racets macros may interfere with user-defined or third-party macros. These shortcomings can be averted with Racet's \texttt{\#lang} mechanism.
+Implementing Racets using macros suffers from two shortcomings: it is not possible to transform bare identifiers, and the Racets macros may interfere with user-defined or third-party macros. These shortcomings can be averted with Racet's \texttt{\#lang} mechanism.
+
+To correctly handle faceted execution, the Racets system needs to wrap (some) identifiers with the \texttt{facet-deref} form. It is simply not possible to achieve this level of transformation with a syntactic macro because identifiers are ``raw'' in the syntax: unlike function applications, lambda definitions, and other Racket constructs, identifiers are not wrapped in an identifier-specific syntactic form at any point in the expansion process, and thus it is impossible for a macro to target identifiers specifically and exclusively.
 
 \subsection{Racets as a language-as-a-library}
 Source files in Racket typically begin with a \texttt{\#lang racket} declaration. However, other languages may be defined (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}) which reuse some of the syntax and semantics of Racket and modify other parts of it, down to the level of lexical structure.
@@ -379,20 +491,10 @@ The final piece is the whole-module rewrite rule:
 
 The \texttt{module-begin} macro invokes \texttt{local-expand} on the module contents, and then converts the syntax object into a list using \texttt{syntax->datum}. The \texttt{transform-syntax} function is invoked on the list, and the result is converted back to a syntax object.
 
+
+
 \section{Conclusion}
 This thesis has identified three areas in which writing code with faceted values faces difficulties: faceted code is slower than non-faceted code, it is easy to make avoidable mistakes when using the \texttt{obs} form, and present implementations of faceted execution have trouble integrating smoothly with external (i.e., non-faceted) code. I have reviewed potential solutions for each of these problems: static analysis by abstract interpretation to reduce runtime overhead, static typing to catch programmer errors, and Racket's \texttt{\#lang} mechanism to ease compatibility with non-faceted code. Additionally, I have shown how the present implementation of Racets could be re-written using \texttt{\#lang}. The techniques and theory reviewed in this thesis should contribute to making writing code with faceted execution more ergonomic, and thus indirectly to safeguarding the privacy of software users.
-
-\begin{comment}
-\section{Research plan}
-My research will proceed in two directions: abstract interpretation and type theory. On the abstract interpretation side of things, it will involve writing several substantial example programs that use faceted execution, for example a grade server in which professors, teacher's assistants, and students all have different levels of access to the grade data, protected by facets. Once I have written these programs in \textsc{Racets}, I will translate them into the language of the abstract interpreter, and assess what conclusions it is able to draw about them, and to what level of precision. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time.
-
-The other part of my research will consist in writing a formal type system for the \textsc{Racets} programming language. As noted in section \ref{sec:facets}, correct use of faceted execution requires that the programmer take care to always match a faceted value with its corresponding policy in calls to \texttt{obs}. A type system that could determine whether a policy corresponds with a facet or not would be able to statically prove whether any call to \texttt{obs} results in a grounded (i.e., non-faceted) value or not---a useful result for checking the correctness of the program.
-
-\textsc{Racets} is a dynamically-typed language (as is its base language, Racket), so any type system that I develop would take the form of a mathematical formalism rather than a concrete implementation, though an actual implementation of it would be possible using Typed Racket, a statically typed variant of Racket \cite{typed-racket}.
-
-My research will aid in understanding the efficacy of static analysis and type theory as applied to faceted execution, and thus contribute to improving the programming-language resources that software developers have available to correctly and reliably enforce privacy policies.
-
-\end{comment}
 
 % TODO: Bib entry for FE Racket looks terrible
 \bibliography{thesis}

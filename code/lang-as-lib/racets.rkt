@@ -2,10 +2,16 @@
 
 (require (for-syntax racket/match))
 
+(define (var-wrapper v vstr)
+  (display "Dereferencing ")
+  (displayln vstr)
+  v)
+
 (begin-for-syntax
   (define (wrap-variable v)
     (let ([vstr (symbol->string v)])
-      `(begin (display "Dereferencing ") (displayln ,vstr) ,v)))
+      (list 'var-wrapper v vstr)))
+      ;`(begin (display "Dereferencing ") (displayln ,vstr) ,v)))
 
   (define (transform-syntax datum)
     (match datum
