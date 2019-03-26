@@ -396,8 +396,8 @@ At present, the \textsc{Racets} system is implemented as a set of syntactic macr
 \begin{lstlisting}
 (define-syntax (fac-lambda stx)
   (syntax-parse stx
-    [(\_ xs expr)
-      \#`(fclo (lambda xs expr))]))
+    [(_ xs expr)
+      #'(fclo (lambda xs expr))]))
 \end{lstlisting}
 
 Other macros are provided for a subset of the core forms of Racket. See \cite{racets} for details of the implementation.
