@@ -11,12 +11,12 @@
 ; Define a syntax for iterating over lists.
 (define-syntax-rule (my-for (id lst) body)
   (letrec ([f (lambda (rec-lst)
-	     (if (empty? rec-lst)
-	       (void)
-	       (begin
-		 (let ([id (car rec-lst)])
-		   body)
-		 (f (cdr rec-lst)))))])
+             (if (empty? rec-lst)
+               (void)
+               (begin
+                 (let ([id (car rec-lst)])
+                   body)
+                 (f (cdr rec-lst)))))])
     (f lst)))
 
 

@@ -53,7 +53,7 @@ expand-to-string  ; Doesn't have to be in parentheses.
   (match (syntax->list stx)
     [(list name condition true-expr false-expr)
      (datum->syntax stx `(cond [,condition ,true-expr]
-			       [else ,false-expr]))]))
+                               [else ,false-expr]))]))
 
 (my-if #t (displayln "true") (displayln "false"))
 
@@ -63,7 +63,7 @@ expand-to-string  ; Doesn't have to be in parentheses.
   (syntax-case stx ()
     [(_ condition true-expr false-expr)
      #'(cond [condition true-expr]
-	     [else false-expr])]))
+             [else false-expr])]))
 
 (my-if-2 #t (displayln "true2") (displayln "false2"))
 
@@ -71,7 +71,7 @@ expand-to-string  ; Doesn't have to be in parentheses.
 ; my-if using define-syntax-rule
 (define-syntax-rule (my-if-3 condition true-expr false-expr)
   (cond [condition true-expr]
-	[else false-expr]))
+        [else false-expr]))
 
 (my-if-3 #t (displayln "true3") (displayln "false3"))
 
@@ -80,12 +80,12 @@ expand-to-string  ; Doesn't have to be in parentheses.
   (syntax-case stx ()
     [(_ a b (args ...) body0 body ...)
      (syntax-case (datum->syntax #'a
-				 (string->symbol (format "~a-~a"
-							 (syntax->datum #'a)
-							 (syntax->datum #'b))))
+                                 (string->symbol (format "~a-~a"
+                                                         (syntax->datum #'a)
+                                                         (syntax->datum #'b))))
        ()
        [name #'(define (name args ...)
-		 body0 body ...)])]))
+                 body0 body ...)])]))
 
 (hyphen-define foo bar () #t)
 (foo-bar)
@@ -97,7 +97,7 @@ expand-to-string  ; Doesn't have to be in parentheses.
     [(_ a b (args ...) body0 body ...)
      (with-syntax ([name (format-id #'a "~a-~a" #'a #'b)])
        #'(define (name args ...)
-	   body0 body ...))]))
+           body0 body ...))]))
 
 (hyphen-define-2 foo bar-2 () #t)
 (foo-bar-2)

@@ -18,36 +18,36 @@
 ; A policy for access to the list of users.
 (define user-list-policy
   (let-label l
-	     (lambda (username)
-	       (if (equal? username "root")
-		 #t
-		 (let ([user (get-user username)])
-		   (and user (or (User-is-admin user) (>= (User-karma user) 100))))))
-	     l))
+             (lambda (username)
+               (if (equal? username "root")
+                 #t
+                 (let ([user (get-user username)])
+                   (and user (or (User-is-admin user) (>= (User-karma user) 100))))))
+             l))
 
 ; A policy for data that any admin can access.
 (define admin-policy
   (let-label l
-	     (lambda (username)
-	       (if (equal? username "root")
-		 #t
-		 (let ([user (get-user username)])
-		   (and user (User-is-admin user)))))
-	     l))
+             (lambda (username)
+               (if (equal? username "root")
+                 #t
+                 (let ([user (get-user username)])
+                   (and user (User-is-admin user)))))
+             l))
 
 ; A policy for data that any user can access.
 (define user-policy
   (let-label l
-	     (lambda (username) (or (equal? username "root") (get-user username)))
-	     l))
+             (lambda (username) (or (equal? username "root") (get-user username)))
+             l))
 
 
 ; Make a policy for a particular user.
 (define (make-policy username)
   (let-label l
-	     (lambda (x)
-	       (or (equal? x username) (User-is-admin (get-user username)) (equal? x "root")))
-	     l))
+             (lambda (x)
+               (or (equal? x username) (User-is-admin (get-user username)) (equal? x "root")))
+             l))
 
 
 ; Helper function to create a user.
@@ -58,8 +58,8 @@
   (fac admin-policy
        (Post username text score flagged)
        (fac user-policy
-	    (Post username text score #f)
-	    (Post "" "" 0 #f))))
+            (Post username text score #f)
+            (Post "" "" 0 #f))))
 
 
 ; Convert a Post object to a string.
@@ -103,8 +103,8 @@
     (if (empty? lst)
       #f
       (if (equal? username (User-name (car lst)))
-	(car lst)
-	(get-user-rec username (cdr lst)))))
+        (car lst)
+        (get-user-rec username (cdr lst)))))
   (get-user-rec username (obs user-list-policy "root" users)))
 
 
@@ -113,8 +113,8 @@
   (displayln
     (render-post
       (list-ref
-	(obs user-policy username (obs admin-policy username posts))
-	post-id))))
+        (obs user-policy username (obs admin-policy username posts))
+        post-id))))
 
 (define (print-user-list username)
   (displayln (map render-user (obs user-list-policy username users))))

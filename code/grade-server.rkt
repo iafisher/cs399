@@ -33,19 +33,19 @@
 (define (reveal-grades arg)
   ; Define a recursive helper function.
   (letrec ([reveal-grades-rec
-	  (lambda (grade-list policy-list arg)
-	    (if (empty? policy-list)
-	      grade-list
-	      (obs
-		(car policy-list)
-		arg
-		(reveal-grades-rec grade-list (cdr policy-list) arg))))])
+          (lambda (grade-list policy-list arg)
+            (if (empty? policy-list)
+              grade-list
+              (obs
+                (car policy-list)
+                arg
+                (reveal-grades-rec grade-list (cdr policy-list) arg))))])
     (reveal-grades-rec student-grades student-policies arg)))
 
 ; Fetch the faceted class average value.
 (define (fetch-class-average)
   (let* ([grades (reveal-grades "professor")]
-	[total (foldr + 0 (map compute-grade grades))])
+        [total (foldr + 0 (map compute-grade grades))])
     (fac open-policy (/ total (length grades)) 0)))
 
 ; Fetch the faceted grade list for the given student.
@@ -53,9 +53,9 @@
   (let ([index (index-of student-names name)])
     (if index
       (fac
-	(list-ref student-policies index)
-	(list-ref (reveal-grades "professor") index)
-	'())
+        (list-ref student-policies index)
+        (list-ref (reveal-grades "professor") index)
+        '())
       '())))
 
 ; Given a student's list of grades, compute their class class.
