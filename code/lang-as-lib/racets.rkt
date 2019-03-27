@@ -11,7 +11,6 @@
   (define (wrap-variable v)
     (let ([vstr (symbol->string v)])
       (list 'var-wrapper v vstr)))
-      ;`(begin (display "Dereferencing ") (displayln ,vstr) ,v)))
 
   (define (transform-syntax datum)
     (match datum
@@ -30,4 +29,5 @@
 
 ; Export everything from Racket, except replace #%module-begin with our implementation.
 (provide (except-out (all-from-out racket) #%module-begin)
-	 (rename-out [module-begin #%module-begin]))
+	 (rename-out [module-begin #%module-begin])
+	 var-wrapper)
