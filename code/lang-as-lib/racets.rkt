@@ -31,7 +31,7 @@
     (match datum
       ; #%app
       [(list '#%app f xs ...)
-       (cons f (map transform-syntax xs))]
+       (cons (transform-syntax f) (map transform-syntax xs))]
 
       ; define-values
       [(list 'define-values ids vs ...)
@@ -44,6 +44,14 @@
       ; quote
       [(list 'quote datum)
        `(quote ,(transform-syntax datum))]
+
+      ; lambda (not sure why this isn't expanded into #%plain-lambda...)
+      [(list 'lambda formals exprs ...)
+       (cons 'lambda (cons formals (map transform-syntax exprs)))]
+
+      ; #%expression
+      [(list '#%expression e)
+       (list '#%expression (transform-syntax e))]
 
       ; Any other list of forms. This case should come second-to-last.
       [(list xs ...)
@@ -62,8 +70,8 @@
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     [(_ forms ...)
-     (let ([as-datum 
-             (syntax->datum 
+     (let ([as-datum
+             (syntax->datum
                (local-expand #'(#%plain-module-begin forms ...) 'module-begin '()))])
        (datum->syntax stx (transform-syntax as-datum)))]))
 

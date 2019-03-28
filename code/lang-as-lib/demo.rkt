@@ -2,9 +2,10 @@
 
 (displayln "Inside demo.rkt")
 
-(define x 10)
-(define y 32)
+(define two 10)
+(define one 32)
 
 ; Various constructs using variables
-(define z y)
-(displayln (+ x y))
+(define three one)
+(+ two three)
+((lambda (four) four) 14)
