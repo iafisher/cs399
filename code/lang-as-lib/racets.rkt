@@ -54,8 +54,8 @@
        (list '#%expression (transform-syntax e))]
 
       ; Any other list of forms. This case should come second-to-last.
-      [(list xs ...)
-       (map transform-syntax xs)]
+      [(list head xs ...)
+       (cons head (map transform-syntax xs))]
 
       ; Any other individual form. This case should come last.
       [default
