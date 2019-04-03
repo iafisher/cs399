@@ -7,3 +7,4 @@
 
 # Build folder for the TeX files
 /texstudio_build
+/vimtex_build
