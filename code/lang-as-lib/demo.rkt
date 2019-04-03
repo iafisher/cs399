@@ -1,5 +1,5 @@
-;#lang s-exp "racets.rkt"
-#lang s-exp "fully-expand-me.rkt"
+#lang s-exp "racets.rkt"
+;#lang s-exp "fully-expand-me.rkt"
 
 (displayln "Inside demo.rkt")
 
@@ -10,3 +10,8 @@
 (define three one)
 (+ two three)
 ((lambda (four) four) 14)
+
+(letrec ([five 5] [six five]) six)
+
+(define seven 7)
+(set! one seven)

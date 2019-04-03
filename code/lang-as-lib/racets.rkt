@@ -20,8 +20,9 @@
 (require (for-syntax racket/match))
 
 (define (var-wrapper v vstr)
-  (display "Dereferencing ")
-  (displayln vstr)
+  (display "Reading variable `")
+  (display vstr)
+  (displayln "`")
   v)
 
 (begin-for-syntax
@@ -36,6 +37,17 @@
       ; define-values
       [(list 'define-values ids vs ...)
        (cons 'define-values (cons ids (map transform-syntax vs)))]
+
+      ; let-values
+      [(list 'let-values (list formals ...) xs ...)
+       (cons 'let-values
+             ; Each member of formals has the form [(id ...) expr]
+             (cons (map (lambda (formal) (list (car formal) (transform-syntax (cadr formal)))))
+                   (map transform-syntax xs)))]
+
+      ; set!
+      [(list 'set! id expr)
+       (list 'set! id (transform-syntax expr))]
 
       ; #%plain-module-begin
       [(list '#%plain-module-begin xs ...)
