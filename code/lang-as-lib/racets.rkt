@@ -26,53 +26,46 @@
   v)
 
 (begin-for-syntax
-  (define (transform-syntax datum)
+  ; TODO [2019-04-04]: Transform this to using syntax-case.
+  (define (transform-syntax stx)
+    (syntax-case stx ()
     ; Match each form in fully-expanded Racket.
     ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
-    (match datum
-      ; #%app
-      [(list '#%app f xs ...)
-       (cons (transform-syntax f) (map transform-syntax xs))]
+      [(#%app f xs ...)
+       #`(,(transform-syntax f) ,(map transform-syntax #'xs))]
 
-      ; define-values
-      [(list 'define-values ids vs ...)
-       (cons 'define-values (cons ids (map transform-syntax vs)))]
+      [(define-values ids vs ...)
+       #`(define-values ids ,(map transform-syntax vs))]
 
-      ; let-values
-      [(list 'let-values (list formals ...) xs ...)
-       (cons 'let-values
-             ; Each member of formals has the form [(id ...) expr]
-             (cons (map (lambda (formal) (list (car formal) (transform-syntax (cadr formal)))))
-                   (map transform-syntax xs)))]
+      [(let-values (formals ...) xs ...)
+       ; Each member of formals has the form [(id ...) expr]
+       (let ([new-formals (map (lambda (formal) (list (car formal) (transform-syntax (cadr formal)))) (syntax->list formals))])
+         #`(let-values new-formals ,(map transform-syntax xs)))]
 
-      ; set!
-      [(list 'set! id expr)
-       (list 'set! id (transform-syntax expr))]
+      [(set! id expr)
+       #`(set! id ,(transform-syntax expr))]
 
-      ; #%plain-module-begin
-      [(list '#%plain-module-begin xs ...)
-       (cons '#%plain-module-begin (map transform-syntax xs))]
+      [(#%plain-module-begin xs ...)
+       #`(#%plain-module-begin ,(map transform-syntax xs))]
 
-      ; quote
-      [(list 'quote datum)
-       `(quote ,(transform-syntax datum))]
+      [(quote datum)
+       #`(quote ,(transform-syntax datum))]
 
-      ; lambda (not sure why this isn't expanded into #%plain-lambda...)
-      [(list 'lambda formals exprs ...)
-       (cons 'lambda (cons formals (map transform-syntax exprs)))]
+      ; Not sure why this isn't expanded into #%plain-lambda...
+      [(lambda formals exprs ...)
+       #`(lambda formals ,(map transform-syntax exprs))]
 
-      ; #%expression
-      [(list '#%expression e)
-       (list '#%expression (transform-syntax e))]
+      [(#%expression e)
+       #`(#%expression ,(transform-syntax e))]
 
       ; Any other list of forms. This case should come second-to-last.
-      [(list head xs ...)
-       (cons head (map transform-syntax xs))]
+      [(head xs ...)
+       #`(head ,(map transform-syntax xs))]
 
       ; Any other individual form. This case should come last.
       [default
        (if (symbol? default)
-         (wrap-variable default)
+         #'(wrap-variable default)
          default)]))
 
   (define (wrap-variable v)
@@ -82,10 +75,8 @@
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     [(_ forms ...)
-     (let ([as-datum
-             (syntax->datum
-               (local-expand #'(#%plain-module-begin forms ...) 'module-begin '()))])
-       (datum->syntax stx (transform-syntax as-datum)))]))
+     (let ([expanded (local-expand #'(#%plain-module-begin forms ...) 'module-begin '())])
+       (transform-syntax expanded))]))
 
 ; Export everything from Racket, except replace #%module-begin with our implementation.
 (provide (except-out (all-from-out racket) #%module-begin)
