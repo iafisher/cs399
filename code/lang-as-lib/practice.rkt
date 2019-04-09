@@ -3,8 +3,8 @@
 (begin-for-syntax
   (define (tree-walk stx)
     (syntax-case stx ()
-      ; Change this to [('#%plain-lambda formals body) and it blows up...
-      [(#%plain-lambda formals body)
+      ; Change this to [('#%plain-lambda formals body) and it works fine...
+      [('#%plain-lambda formals body)
        (displayln "Got a plain lambda!")]
       [(head . tail)
        (tree-walk #'tail)])))
