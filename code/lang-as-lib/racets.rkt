@@ -32,41 +32,43 @@
     ; Match each form in fully-expanded Racket.
     ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
       [(#%app f xs ...)
-       #`(,(transform-syntax f) ,(map transform-syntax #'xs))]
+       #`(#,(transform-syntax f) #,(map transform-syntax (syntax-e #'(xs ...))))]
 
       [(define-values ids vs ...)
-       #`(define-values ids ,(map transform-syntax vs))]
+       #`(define-values ids #,(map transform-syntax (syntax-e #'(vs ...))))]
 
+      #|
       [(let-values (formals ...) xs ...)
        ; Each member of formals has the form [(id ...) expr]
        (let ([new-formals (map (lambda (formal) (list (car formal) (transform-syntax (cadr formal)))) (syntax->list formals))])
          #`(let-values new-formals ,(map transform-syntax xs)))]
+      |#
 
       [(set! id expr)
-       #`(set! id ,(transform-syntax expr))]
+       #`(set! id #,(transform-syntax expr))]
 
       [(#%plain-module-begin xs ...)
-       #`(#%plain-module-begin ,(map transform-syntax xs))]
+       #`(#%plain-module-begin #,(map transform-syntax (syntax-e #'(xs ...))))]
 
       [(quote datum)
-       #`(quote ,(transform-syntax datum))]
+       #`(quote #,(transform-syntax datum))]
 
       ; Not sure why this isn't expanded into #%plain-lambda...
       [(lambda formals exprs ...)
-       #`(lambda formals ,(map transform-syntax exprs))]
+       #`(lambda formals #,(map transform-syntax (syntax-e #'(exprs ...))))]
 
       [(#%expression e)
-       #`(#%expression ,(transform-syntax e))]
+       #`(#%expression #,(transform-syntax e))]
 
       ; Any other list of forms. This case should come second-to-last.
       [(head xs ...)
-       #`(head ,(map transform-syntax xs))]
+       #`(head #,(map transform-syntax #'(xs ...)))]
 
       ; Any other individual form. This case should come last.
       [default
-       (if (symbol? default)
+       (if (symbol? (syntax->datum #'default))
          #'(wrap-variable default)
-         default)]))
+         #'default)]))
 
   (define (wrap-variable v)
     (let ([vstr (symbol->string v)])
