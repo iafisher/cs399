@@ -19,18 +19,15 @@
 
 (define-syntax (test-expand stx)
   (syntax-case stx ()
-    [(_ forms ...)
+    [(_ form)
      (begin
-       (define expanded (local-expand #'(#%plain-module-begin forms ...) 'module-begin '()))
-       (displayln expanded))])
-
-  (let ([fixed (datum->syntax stx (cons '#%plain-module-begin (cdr (syntax->datum stx))))])
-    (define expanded (local-expand fixed 'module-begin '()))
-    (tree-walk expanded)
-    (displayln expanded))
+       (define expanded (local-expand #'form 'expression '()))
+       (tree-walk expanded)
+       (displayln expanded)
+       #'(void))])
   #'(void))
 
 
-(test-macro (lambda (x) x x x))
-(test-macro x)
+;(test-macro (lambda (x) x x x))
+;(test-macro x)
 (test-expand (lambda (x) x))
