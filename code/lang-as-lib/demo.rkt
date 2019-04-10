@@ -1,5 +1,5 @@
 ; A module that demonstrates many different Racket forms to test the Racets implementation on.
-#lang s-exp "racets2.rkt"
+#lang s-exp "racets.rkt"
 
 (displayln "Inside demo.rkt")
 

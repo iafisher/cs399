@@ -13,7 +13,7 @@
 ; #%module-begin is exported which walks the syntax tree and effects a whole-module
 ; transformation of the source code.
 ;
-; You can configure other modules to use this language by putting #lang s-exp "racets2.rkt" at
+; You can configure other modules to use this language by putting #lang s-exp "racets.rkt" at
 ; the top of the module instead of #lang racket.
 #lang racket
 
