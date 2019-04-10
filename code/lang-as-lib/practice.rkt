@@ -3,11 +3,20 @@
 (begin-for-syntax
   (define (tree-walk stx)
     (syntax-case stx ()
-      ; Change this to [('#%plain-lambda formals body) and it works fine...
-      [('#%plain-lambda formals body)
-       (displayln "Got a plain lambda!")]
-      [(head . tail)
-       (tree-walk #'tail)])))
+      [(lambda-form formals body)
+       ;(if (free-identifier=? #'lambda-form #'#%plain-lambda)
+       (displayln (syntax->datum #'lambda-form))
+       (if (free-identifier=? #'lambda-form #'lambda)
+         (displayln "Got a plain lambda!")
+         (begin
+           (displayln "Did not get a plain lambda!")
+           ;(tree-walk #'formals)
+           (tree-walk #'body)
+           ;))]
+           ))]
+      [(forms ...)
+       (displayln "Hit the second case")
+       (map tree-walk (syntax-e #'(forms ...)))])))
 
 
 (define-syntax (test-expand stx)
@@ -15,6 +24,7 @@
     [(_ forms ...)
      (begin
        (define expanded (local-expand #'(values forms ...) 'expression '()))
+       (displayln (syntax->datum expanded))
        (tree-walk expanded)
        #'(void))])
   #'(void))
