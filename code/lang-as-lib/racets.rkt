@@ -13,11 +13,9 @@
 ; #%module-begin is exported which walks the syntax tree and effects a whole-module
 ; transformation of the source code.
 ;
-; You can configure other modules to use this language by putting #lang s-exp "racets.rkt" at
+; You can configure other modules to use this language by putting #lang s-exp "racets2.rkt" at
 ; the top of the module instead of #lang racket.
 #lang racket
-
-(require (for-syntax racket/match))
 
 (define (var-wrapper v vstr)
   (display "Reading variable `")
@@ -26,53 +24,43 @@
   v)
 
 (begin-for-syntax
-  ; TODO [2019-04-04]: Transform this to using syntax-case.
   (define (transform-syntax stx)
+    ;(displayln (syntax->datum stx))
     (syntax-case stx ()
-    ; Match each form in fully-expanded Racket.
-    ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
-      [(#%app f xs ...)
-       #`(#,(transform-syntax f) #,(map transform-syntax (syntax-e #'(xs ...))))]
+      ; Match each form in fully-expanded Racket.
+      ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
 
-      [(define-values ids vs ...)
-       #`(define-values ids #,(map transform-syntax (syntax-e #'(vs ...))))]
+      ; set!
+      ([head id expr]
+       (free-identifier=? #'head #'set!)
+       #`(head id #,(transform-syntax #'expr)))
 
-      #|
-      [(let-values (formals ...) xs ...)
-       ; Each member of formals has the form [(id ...) expr]
-       (let ([new-formals (map (lambda (formal) (list (car formal) (transform-syntax (cadr formal)))) (syntax->list formals))])
-         #`(let-values new-formals ,(map transform-syntax xs)))]
-      |#
+      ; provide
+      ([head a ...]
+       (and (identifier? #'head) (free-identifier=? #'head #'#%provide))
+       stx)
 
-      [(set! id expr)
-       #`(set! id #,(transform-syntax expr))]
+      ; #%plain-lambda
+      ([head formals expr ...]
+       (and (identifier? #'head) (free-identifier=? #'head #'#%plain-lambda))
+       (datum->syntax stx
+                      (cons #'head
+                            (cons #'formals
+                                  (map transform-syntax (syntax-e #'(expr ...)))))))
 
-      [(#%plain-module-begin xs ...)
-       #`(#%plain-module-begin #,(map transform-syntax (syntax-e #'(xs ...))))]
+      ; Any other list.
+      ([a b ...]
+       (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
 
-      [(quote datum)
-       #`(quote #,(transform-syntax datum))]
-
-      ; Not sure why this isn't expanded into #%plain-lambda...
-      [(lambda formals exprs ...)
-       #`(lambda formals #,(map transform-syntax (syntax-e #'(exprs ...))))]
-
-      [(#%expression e)
-       #`(#%expression #,(transform-syntax e))]
-
-      ; Any other list of forms. This case should come second-to-last.
-      [(head xs ...)
-       #`(head #,(map transform-syntax #'(xs ...)))]
-
-      ; Any other individual form. This case should come last.
-      [default
-       (if (symbol? (syntax->datum #'default))
-         #'(wrap-variable default)
-         #'default)]))
+      ; Any other individual form.
+      (default
+        (if (identifier? #'default)
+          (wrap-variable #'default)
+          #'default))))
 
   (define (wrap-variable v)
-    (let ([vstr (symbol->string v)])
-      (list 'var-wrapper v vstr))))
+    (let ([vstr (symbol->string (syntax->datum v))])
+      #`(var-wrapper #,v #,vstr))))
 
 (define-syntax (module-begin stx)
   (syntax-case stx ()
