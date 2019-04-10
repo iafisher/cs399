@@ -17,8 +17,6 @@
 ; the top of the module instead of #lang racket.
 #lang racket
 
-(require (for-syntax racket/match))
-
 (define (var-wrapper v vstr)
   (display "Reading variable `")
   (display vstr)
@@ -33,16 +31,29 @@
       ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
 
       ; set!
-      ([f id expr]
-       (free-identifier=? #'f #'set!)
-       #`(f id #,(transform-syntax #'expr)))
+      ([head id expr]
+       (free-identifier=? #'head #'set!)
+       #`(head id #,(transform-syntax #'expr)))
+
+      ; provide
+      ([head a ...]
+       (and (identifier? #'head) (free-identifier=? #'head #'#%provide))
+       stx)
+
+      ; #%plain-lambda
+      ([head formals expr ...]
+       (and (identifier? #'head) (free-identifier=? #'head #'#%plain-lambda))
+       (datum->syntax stx
+                      (cons #'head
+                            (cons #'formals
+                                  (map transform-syntax (syntax-e #'(expr ...)))))))
 
       ; Any other list.
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
 
       ; Any other individual form.
-      (default 
+      (default
         (if (identifier? #'default)
           (wrap-variable #'default)
           #'default))))

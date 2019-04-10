@@ -1,5 +1,5 @@
+; A module that demonstrates many different Racket forms to test the Racets implementation on.
 #lang s-exp "racets2.rkt"
-;#lang s-exp "fully-expand-me.rkt"
 
 (displayln "Inside demo.rkt")
 
@@ -15,3 +15,7 @@
 
 (define seven 7)
 (set! one seven)
+
+(lambda (x y) 10)
+
+(provide three)
