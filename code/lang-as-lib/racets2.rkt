@@ -31,15 +31,21 @@
     (syntax-case stx ()
       ; Match each form in fully-expanded Racket.
       ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
+
+      ; set!
+      ([f id expr]
+       (free-identifier=? #'f #'set!)
+       #`(f id #,(transform-syntax #'expr)))
+
+      ; Any other list.
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
+
+      ; Any other individual form.
       (default 
         (if (identifier? #'default)
           (wrap-variable #'default)
           #'default))))
-
-  (define (should-wrap? v)
-    (and (identifier? v) (not (free-identifier=? v #'#%plain-module-begin))))
 
   (define (wrap-variable v)
     (let ([vstr (symbol->string (syntax->datum v))])
