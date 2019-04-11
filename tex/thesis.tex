@@ -407,7 +407,19 @@ Other macros are provided for a subset of the core forms of Racket. See \cite{ra
 \subsubsection{Shortcomings}
 Implementing \textsc{Racets} using macros suffers from two shortcomings: it is not possible to transform bare identifiers, and the \textsc{Racets} macros may interfere with user-defined or third-party macros.
 
-To correctly handle faceted execution, the \textsc{Racets} system needs to wrap (some) identifiers with the \texttt{facet-deref} form. It is simply not possible to achieve this level of transformation with a syntactic macro because identifiers are ``raw'' in the syntax: unlike function applications, lambda definitions, and other Racket constructs, identifiers are not wrapped in an identifier-specific syntactic form at any point in the expansion process, and thus it is impossible for a macro to target identifiers specifically and exclusively.
+To correctly handle faceted execution, the \textsc{Racets} system needs to wrap (some) identifiers with the \texttt{facet-deref} form. To see why, consider the following code block:
+
+\begin{lstlisting}
+(if k
+  (set! x 100)
+  (set! x 0))
+\end{lstlisting}
+
+Suppose that \texttt{k} is a facet belonging to Alice whose high-confidentiality value is true and whose low-confidentiality value is false. Upon execution of the \texttt{if} statement, the value of \texttt{x} will be a box that contains the facet $\langle \textit{alice}\ ?\ 100 : 0 \rangle$. However, subsequent references to \texttt{x} will assume that it is of integer type, and without a \texttt{facet-deref} transformation to extract the underlying facet from the box, these references may cause the code fail.
+
+Note that this is a different problem from invisibly transforming regular values into facets, as was done in many of the examples of section \ref{sec:facets}. Faceted values are automatically handled by the faceted execution mechanism, e.g. the re-defining of the \texttt{\#\%app} macro to work for facets. The problem here is that the use of the \texttt{set!} form (which expands to \texttt{facet-set!} in \textsc{Racets}) results in \texttt{x} becoming a box containing a facet and not just a bare facet.
+
+It is simply not possible to target bare identifiers with a syntactic macro because identifiers are ``raw'' in the syntax: unlike function applications, lambda definitions, and other Racket constructs, identifiers are not wrapped in an identifier-specific syntactic form at any point in the expansion process, and thus it is impossible for a macro to target them specifically and exclusively, at least in the way that, e.g., \texttt{\#\%app} can target every function application.
 
 
 \subsection{Racets as a language-as-a-library}
