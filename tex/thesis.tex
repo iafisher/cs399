@@ -201,9 +201,25 @@ Then the value of the list would be
   (fac alice-policy (list 0 84) (list 0 0)))
 \end{lstlisting}
 
-encompassing four different possibilities: satisfying both Alice and Bob's policies, satisfying one or the other, or satisfying neither.
+\noindent encompassing four different possibilities: satisfying both Alice and Bob's policies, satisfying one or the other, or satisfying neither. The tree below illustrates this structure diagrammatically.
 
-The following procedure observes the entire list of grades into a regular Racket list of integers:
+\begin{center}
+	\begin{tikzpicture}
+		\Tree
+		[.\texttt{bob-policy}
+			[.\texttt{alice-policy}
+				\texttt{(list 73 84)}
+				\texttt{(list 73 0)}
+			]
+			[.\texttt{alice-policy}
+				\texttt{(list 0 84)}
+				\texttt{(list 0 0)}
+			]
+		]
+	\end{tikzpicture}
+\end{center}
+
+Programmers may find it useful to convert a list of facets into a regular Racket list. The following procedure accomplishes just that.
 
 \begin{lstlisting}
 (define (reveal-grades-rec grade-list policy-list arg)
@@ -218,7 +234,7 @@ The following procedure observes the entire list of grades into a regular Racket
         arg))))])
 \end{lstlisting}
 
-It takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
+\texttt{reveal-grades-rec} takes in a list of grades, a list of policies which should correspond index-by-index to the list of grades (remember that \texttt{obs} requires the policy to match the facet's policy), and an argument to pass to the policy predicates.
 
 This section and the previous one have illustrated fundamental issues with the interaction of faceted execution and data structures, stemming from the generic treatment of faceted function application. For the sake of programming ergonomics, future implementations of faceted execution may wish to not treat functional application quite so generically, to allow structure-creating forms like \texttt{list} and struct constructors to be special cases that behave more intuitively with faceted arguments.
 
@@ -352,7 +368,7 @@ A type system for the lambda calculus (and indeed for any programming language) 
 {\text{conclusion}}
 \]
 
-where \textit{hypotheses} is a set of assumptions and \textit{conclusion} is a type judgment that follows from the hypotheses.
+\noindent where \textit{hypotheses} is a set of assumptions and \textit{conclusion} is a type judgment that follows from the hypotheses.
 
 The rule for the types of variables is\footnote{The type rules are taken from Figure 9-1 on p. 103 of \cite{types}.}
 
