@@ -18,4 +18,6 @@
 
 (lambda (x y) 10)
 
+(quote fifteen)
+
 (provide three)

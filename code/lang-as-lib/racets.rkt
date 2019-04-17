@@ -58,7 +58,7 @@
                             (cons #'formals
                                   (map transform-syntax (syntax-e #'(expr ...)))))))
 
-      ; For any other list of forms, recursively transform each sub-form.
+      ; For any other list of forms, recursively transform each sub-form (except the first).
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
 
