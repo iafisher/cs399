@@ -17,27 +17,37 @@
 ; the top of the module instead of #lang racket.
 #lang racket
 
+
 (define (var-wrapper v vstr)
   (display "Reading variable `")
   (display vstr)
   (displayln "`")
   v)
 
+
 (begin-for-syntax
   (define (transform-syntax stx)
-    ;(displayln (syntax->datum stx))
+    ; Recursively transform the syntax tree so that every bare identifier is wrapped by the
+    ; `var-wrapper` function defined above.
+
     (syntax-case stx ()
-      ; Match each form in fully-expanded Racket.
-      ; https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
+      ; Match each form in fully-expanded Racket. Note that only forms which specifically
+      ; require that some of their sub-parts are not recursively transformed need to be special-
+      ; cased here, since a default case at the end which recursively walks the tree should
+      ; handle most of the forms.
+      ;
+      ; See the Racket manual for details on fully-expanded Racket:
+      ;   https://docs.racket-lang.org/reference/syntax-model.html#(part._fully-expanded)
 
       ; set!
       ([head id expr]
-       (free-identifier=? #'head #'set!)
+       ; Guard clause to ensure that the head of the list is set!
+       (check-ident #'head #'set!)
        #`(head id #,(transform-syntax #'expr)))
 
       ; provide
       ([head a ...]
-       (and (identifier? #'head) (free-identifier=? #'head #'#%provide))
+       (check-ident #'head #'#%provide)
        stx)
 
       ; #%plain-lambda
@@ -48,25 +58,34 @@
                             (cons #'formals
                                   (map transform-syntax (syntax-e #'(expr ...)))))))
 
-      ; Any other list.
+      ; For any other list of forms, recursively transform each sub-form.
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
 
-      ; Any other individual form.
+      ; For any other individual form, wrap it if it is a symbol.
       (default
         (if (identifier? #'default)
           (wrap-variable #'default)
           #'default))))
 
+  (define (check-ident ident expected)
+    ; Check that the identifier is bound to the same reference as `expected`.
+    (and (identifier? ident) (free-identifier=? ident expected)))
+
   (define (wrap-variable v)
+    ; Helper function to wrap the symbol with `var-wrapper` with the proper arguments.
     (let ([vstr (symbol->string (syntax->datum v))])
       #`(var-wrapper #,v #,vstr))))
 
+
 (define-syntax (module-begin stx)
+  ; Intercept the entire module and transform it using `transform-syntax` on the fully-expanded
+  ; syntax tree (which ensures that user macros are expanded first).
   (syntax-case stx ()
     [(_ forms ...)
      (let ([expanded (local-expand #'(#%plain-module-begin forms ...) 'module-begin '())])
        (transform-syntax expanded))]))
+
 
 ; Export everything from Racket, except replace #%module-begin with our implementation.
 (provide (except-out (all-from-out racket) #%module-begin)
