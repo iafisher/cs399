@@ -486,7 +486,7 @@ where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be th
 
 
 \subsubsection{Larger example of a language-as-a-library}
-As a proof-of-concept of implementing Racets with the language-as-a-library approach, this section presents a library called \texttt{wrap-ident.rkt} that rewrites identifiers in the source code so that the text of the identifier is printed out whenever it is evaluated. For example, running the module below would generate the output \texttt{Dereferencing x  Dereferencing y}.
+As a proof-of-concept of implementing Racets with the language-as-a-library approach, this section presents a library called \texttt{wrap-ident.rkt} that rewrites identifiers in the source code so that the text of the identifier is printed out whenever it is evaluated. For example, running the module below would generate the output \texttt{Reading variable +  Reading variable x  Reading variable y}.
 
 \begin{lstlisting}
 #lang s-exp "wrap-ident.rkt"
@@ -496,33 +496,76 @@ As a proof-of-concept of implementing Racets with the language-as-a-library appr
 (displayln (+ x y))
 \end{lstlisting}
 
-The \texttt{wrap-ident.rkt} defines two helper functions, \texttt{transform-syntax} and \texttt{wrap-variable}, which together transform the AST in the prescribed manner. Since these functions are used by a macro (but are not themselves macros), they must be wrapped in a \texttt{begin-for-syntax} block:
+The effect of the \texttt{wrap-ident.rkt} module is to re-write the syntax tree roughly as follows:
 
 \begin{lstlisting}
-#lang racket
+(define x 10)
+(define y 32)
+(displayln ((var-wrapper + "+") (var-wrapper x "x")
+                                    (var-wrapper y "y")))
+\end{lstlisting}
 
-(require (for-syntax racket/match))
+where \texttt{var-wrapper} is defined as
 
-(begin-for-syntax
-  (define (wrap-variable v)
-    (let ([vstr (symbol->string v)])
-      (quasiquote
-        (begin
-          (display "Dereferencing ") (displayln ,vstr) ,v))))
+\begin{lstlisting}
+(define (var-wrapper v vstr)
+  (display "Reading variable `")
+  (display vstr)
+  (displayln "`")
+  ; Return the variable so the expression as a whole evaluates
+  ; to the same thing as before.
+  v)
+\end{lstlisting}
 
-  (define (transform-syntax datum)
-    (match datum
-      [(list '#%app f xs ...)
-        (cons
-          f
-          (map
-            (lambda (x)
-              (if (symbol? x)
-                (wrap-variable x)
-                (transform-syntax x)))
-            xs))]
-      [(list xs ...) (map transform-syntax xs)]
-      [default default])))
+The cornerstone of the \texttt{wrap-ident.rkt} module is the \texttt{transform-syntax} procedure, which recursively walks the program's syntax tree and wraps bare identifiers with \texttt{var-wrapper}. Most forms in fuly-expanded Racket can be transformed simply by recursively transforming each of sub-forms except for the first (which is typically a special identifier like \texttt{define} or \texttt{set!} which cannot be wrapped in a function call). Some forms need to be treated specially because their syntax forbids some of their subforms from being wrapped. An example is \texttt{set!}: if \texttt{(set! x 10)} were re-written as \texttt{(set! (var-wrapper x "x") 10)}, then Racket would give a syntax error as the first argument to \texttt{set!} must be a bare identifier. \texttt{transform-syntax} therefore contains several pattern matches for forms which must be treated specially, followed by a default case for any other list of forms, followed by a case for any individual form, which performs the actual work of identifying and re-writing identifiers.
+
+\begin{lstlisting}
+(define (transform-syntax stx)
+  (syntax-case stx ()
+    ; set!
+    ([head id expr]
+     (check-ident #'head #'set!)
+     #`(head id #,(transform-syntax #'expr)))
+
+    ; provide
+    ([head a ...]
+     (check-ident #'head #'#%provide)
+     stx)
+
+    ; #%plain-lambda
+    ([head formals expr ...]
+     (check-ident #'head #'#%plain-lambda)
+     (datum->syntax stx
+                    (cons #'head
+                          (cons #'formals
+                                (map transform-syntax
+				     (syntax-e #'(expr ...)))))))
+
+    ; Any other list of forms.
+    ([a b ...]
+     (datum->syntax stx (cons #'a (map transform-syntax
+                                           (syntax-e #'(b ...))))))
+
+    ; Any other individual form.
+    (default
+      (if (identifier? #'default)
+        (wrap-variable #'default)
+        #'default))))
+\end{lstlisting}
+
+Each of the special cases above has a guard clause that uses the helper function \texttt{check-ident} to make sure that the head of the matched form is bound to the same variable as the form we intend to re-write. \texttt{check-ident} is defined below. It uses \texttt{free-identifier=?} to check its argument's binding. It is important to use this method and not simply compared the textual content of the identifiers because Racket does not guarantee these will be the same. For example, an identifier may have the surface form of \texttt{lambda} but actually be bound to \texttt{\#\%plain-lambda}. \texttt{free-identifier=?}, unlike an equality comparison, is sensitive to these distinctions.
+
+\begin{lstlisting}
+(define (check-ident ident expected)
+  (and (identifier? ident) (free-identifier=? ident expected)))
+\end{lstlisting}
+
+\texttt{transform-syntax} makes use of a helper function called \texttt{wrap-variable}, which produces the syntactic form \texttt{(var-wrapper x "x")} given \texttt{x}.
+
+\begin{lstlisting}
+(define (wrap-variable v)
+  (let ([vstr (symbol->string (syntax->datum v))])
+    #`(var-wrapper #,v #,vstr))))
 \end{lstlisting}
 
 \texttt{(wrap-variable p)} evaluates to \texttt{(begin (display "Dereferencing) (displayln "p") p)}. \texttt{transform-syntax} recursively traverses the AST and rewrites symbols using \texttt{wrap-variable}. In the implementation above, only function applications (represented by the \texttt{\#\%app} base form in fully-expanded Racket) have their identifiers re-written. A full implementation of this language would have a separate case for each of the base forms in fully-expanded Racket that could potentially take an identifier argument.

@@ -52,7 +52,7 @@
 
       ; #%plain-lambda
       ([head formals expr ...]
-       (and (identifier? #'head) (free-identifier=? #'head #'#%plain-lambda))
+       (check-ident #'head #'#%plain-lambda)
        (datum->syntax stx
                       (cons #'head
                             (cons #'formals
