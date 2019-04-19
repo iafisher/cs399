@@ -11,7 +11,7 @@
 (+ two three)
 ((lambda (four) four) 14)
 
-(letrec ([five 5] [six five]) six)
+(letrec ([five two] [six five]) six)
 
 (define seven 7)
 (set! one seven)

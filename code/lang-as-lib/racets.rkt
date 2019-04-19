@@ -67,6 +67,8 @@
        (check-ident #'head #'quote)
        #'(head datum))
 
+      ; TODO [2019-04-18]: let-values and letrec-values are not handled correctly.
+
       ; For any other list of forms, recursively transform each sub-form (except the first).
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
