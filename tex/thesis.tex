@@ -602,8 +602,41 @@ One technique for static analysis is abstract interpretation, wherein the comput
 
 The level of detail that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
 
+The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every single variable reference needs a conditional. A simple module like below
+
+\begin{lstlisting}
+#lang s-exp "racets.rkt"
+
+(define x 10)
+(define y 32)
+(displayln (+ x y))
+\end{lstlisting}
+
+\noindent would balloon into
+
+\begin{lstlisting}
+#lang s-exp "racets.rkt"
+
+(define x 10)
+(define y 32)
+(
+ ; displayln
+ (if (and (box? displayln) (facet? (unbox displayln)))
+      (unbox displayln)
+      displayln)
+  ; x
+  (if (and (box? x) (facet? (unbox x)))
+    (unbox x)
+    x)
+  ; y
+  (if (and (box? y) (facet? (unbox y)))
+    (unbox y)
+    y))
+\end{lstlisting}
+
+Of course, none of these conditionals are actually necessary, because it is apparent that neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime. TODO: How would abstract interpretation apply here?
+
 TODO: More details about the abstracting abstract machines approach.
-TODO: Show how a small example program is transformed by the Racets macros, and point out how abstract interpretation could simplify it.
 
 
 
