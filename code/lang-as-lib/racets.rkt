@@ -1,13 +1,15 @@
-; This module defines a Racket-like language that is identical to normal Racket except that
-; whenever an identifier is used, the identifier is printed, e.g.
+; This module defines a proof-of-concept for extending the Racets language
+; (https://github.com/fordsec/racets) to handle bare identifiers correctly. Bare identifiers
+; need to be wrapped in a function (defined as `var-wrapper` in this module) that checks if
+; they are a boxed facet, and unboxes them if they are, in order to handle code like
 ;
-;   (define x 10)
-;   (+ x 32)
+;   (if k
+;     (set! x 42)
+;     (set! x 0))
 ;
-; will print "Dereferencing x".
-;
-; This language is a proof-of-concept for implementing Racets, which will similarly need to
-; transform bare identifiers in the source code.
+; where if `k` is a facet, then `x` will end up as a box containing a facet instead of an
+; integer as the rest of the code would expect. `x` will subsequently need to be unboxed
+; wherever it is used. The variable wrapper defined in this module accomplishes that.
 ;
 ; The implementation uses the "languages-as-libraries" approach, in which a macro for
 ; #%module-begin is exported which walks the syntax tree and effects a whole-module
@@ -18,11 +20,13 @@
 #lang racket
 
 
-(define (var-wrapper v vstr)
-  (display "Reading variable `")
-  (display vstr)
-  (displayln "`")
-  v)
+(struct facet (labelname left right) #:transparent)
+
+
+(define (var-wrapper v)
+  (if (and (box? v) (facet? (unbox v)))
+    (unbox v)
+    v))
 
 
 (begin-for-syntax
@@ -65,17 +69,12 @@
       ; For any other individual form, wrap it if it is a symbol.
       (default
         (if (identifier? #'default)
-          (wrap-variable #'default)
+          #`(var-wrapper #,#'default)
           #'default))))
 
   (define (check-ident ident expected)
     ; Check that the identifier is bound to the same reference as `expected`.
-    (and (identifier? ident) (free-identifier=? ident expected)))
-
-  (define (wrap-variable v)
-    ; Helper function to wrap the symbol with `var-wrapper` with the proper arguments.
-    (let ([vstr (symbol->string (syntax->datum v))])
-      #`(var-wrapper #,v #,vstr))))
+    (and (identifier? ident) (free-identifier=? ident expected))))
 
 
 (define-syntax (module-begin stx)
