@@ -62,6 +62,11 @@
                             (cons #'formals
                                   (map transform-syntax (syntax-e #'(expr ...)))))))
 
+      ; quote
+      ([head datum]
+       (check-ident #'head #'quote)
+       #'(head datum))
+
       ; For any other list of forms, recursively transform each sub-form (except the first).
       ([a b ...]
        (datum->syntax stx (cons #'a (map transform-syntax (syntax-e #'(b ...))))))
