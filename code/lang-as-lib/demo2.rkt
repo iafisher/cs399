@@ -1,8 +1,5 @@
 #lang s-exp "racets.rkt"
 
-(define (my-map f xs)
-  (if (null? xs)
-    '()
-    (cons (f (car xs)) (my-map f (cdr xs)))))
-
-(my-map displayln '(1 2 3))
+(define x 10)
+(define y 32)
+(displayln (+ x y))
