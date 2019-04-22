@@ -1,4 +1,4 @@
-BUILD=texstudio_build
+BUILD=vimtex_build
 PDFDIR=pdf
 LATEX=pdflatex
 BIBTEX=bibtex
@@ -8,7 +8,7 @@ $(shell mkdir -p $(BUILD) >/dev/null)
 $(shell mkdir -p $(PDFDIR) >/dev/null)
 
 
-all: $(PDFDIR)/research_proposal.pdf
+all: $(PDFDIR)/research_proposal.pdf $(PDFDIR)/thesis.pdf
 
 
 $(PDFDIR)/research_proposal.pdf: research_proposal.tex thesis.bib
@@ -17,7 +17,17 @@ $(PDFDIR)/research_proposal.pdf: research_proposal.tex thesis.bib
 	# Compile twice so references work.
 	$(LATEX) -output-directory=$(BUILD) research_proposal.tex
 	$(LATEX) -output-directory=$(BUILD) research_proposal.tex
-	mv $(BUILD)/research_proposal.pdf $(PDFDIR)
+	cp $(BUILD)/research_proposal.pdf $(PDFDIR)
+
+
+$(PDFDIR)/thesis.pdf: thesis.tex thesis.bib
+	$(LATEX) -output-directory=$(BUILD) thesis.tex
+	$(BIBTEX) $(BUILD)/thesis.aux
+	# Compile twice so references work.
+	$(LATEX) -output-directory=$(BUILD) thesis.tex
+	$(LATEX) -output-directory=$(BUILD) thesis.tex
+	cp $(BUILD)/thesis.pdf $(PDFDIR)
+
 
 clean:
 	rm -f $(BUILD)/* $(PDFDIR)/*.pdf
