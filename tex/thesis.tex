@@ -38,7 +38,7 @@
 \maketitle
 
 \begin{abstract}
-	This thesis draft reviews faceted execution, a programming-language mechanism for enforcing privacy policies. I discuss several issues with the use of faceted execution in real-world software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism). I present a proof-of-concept of a module-rewriting technique that could be used to improve the existing \textsc{Racets} system \cite{racets} for faceted execution in Racket.
+	This thesis draft reviews faceted execution, a programming-language mechanism for enforcing privacy policies. I discuss several issues with the use of faceted execution in real-world software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism). I present a proof-of-concept of a module-rewriting technique that could be used to improve the existing \textsc{Racets} system \cite{racets} for faceted execution in Racket. In the course of exploring these topics, I also give expositions of the typed lambda calculus and abstract interpretation aimed at the undergraduate computer science level.
 \end{abstract}
 
 \tableofcontents
@@ -617,28 +617,28 @@ In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \ka
 The entirety of the operation of the CEK machine can be described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}.} The first rule is for evaluating variables:
 
 % Evaluating a symbol
-$$ \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
+$$ \text{1. } \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
 
 The new expression to evaluate is whatever the variable mapped to in the environment. We replace the old environment with the environment attached the variable's values, to capture the correct behavior of closures. The continuation is preserved since evaluating variables does not involve a change in control flow.
 
 The second rule is for evaluating function applications:
 
 % Evaluating an application
-$$ \langle (e_0 e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
+$$ \text{2. } \langle (e_0 e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
 
 Upon seeing a function application, the first expression to be evaluated is the function that is being applied, so this function ($e_0$ in the formula) is the expression in the output state. The environment in which the function is evaluated is the same in which the function application as a whole is evaluated. The new continuation directs the abstract machine to evaluate the argument next, in the same environment, followed by the original continuation (so that the machine can move on to do what it needs to do next).
 
 The last two rules handle the evaluation of values (which in the lambda calculus are always closures). If the current continuation is of the \textbf{ar} form, the following rule applies:
 
 % Evaluating an argument
-$$ \langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle \to \langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle $$
+$$ \text{3. } \langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle \to \langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle $$
 
 The current continuation indicates that the argument $e$ is the next thing to be evaluated, so that is set as the expression in the output state. The old environment is replaced with the environment provided by the continuation. After evaluating the argument, we want to evaluate the body of the function, so we provide a \textbf{fn} continuation that encapsulates the function itself, the original environment, and the original continuation.
 
 The last rule applies to evaluating values with an \textbf{fn} continuation:
 
 % Evaluating a function
-$$ \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \to (v, \rho)], \kappa \rangle $$
+$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \to (v, \rho)], \kappa \rangle $$
 
 The body of the function, $e$, is the next expression to be evaluated, so it goes in the expression slot of the output state. The environment is the one indicated by the old continuation, augmented with a binding of the function's parameter to the value of its argument, which we know is in the old expression slot based on the previous rule. Finally, we preserve the old continuation.
 
@@ -649,10 +649,24 @@ $$ inj_{CEK}(e) = \langle e, \emptyset, \textbf{mt} \rangle $$
 The preceding discussion may be clarified by a concrete example. Suppose we want to evaluate the lambda expression $(\lambda x.x\ \lambda y.y)$ (which should evaluate to $\lambda y.y$). We begin by applying $inj_{CEK}$ to get our initial state:
 
 $$ s_0 = \langle (\lambda x.x\ \lambda y.y), \emptyset, \textbf{mt} \rangle $$
+
+This expression matches rule 2, so we apply the rule to yield the next state. As expected, we are evaluating the function ($\lambda x.x$) first, and the continuation indicates that we must evaluate the argument afterwards:
+
 $$ s_1 = \langle \lambda x.x, \emptyset, \textbf{ar}(\lambda y.y, \emptyset, \textbf{mt}) \rangle $$
+
+$s_1$ in turn matches rule 3, which we apply mechanically below. We are now evaluating the argument, and the continuation tells us that evaluating the body of the function is next.
+
 $$ s_2 = \langle \lambda y.y, \emptyset, \textbf{fn}(\lambda x.x, \emptyset, \textbf{mt}) \rangle $$
-$$ s_3 = \langle x, {x: (\lambda y.y, \emptyset)}, \textbf{mt} \rangle $$
+
+$s_2$ matches rule 4. We bind the value of the argument to the function's parameter in the environment, and evaluate the body in this new environment. Since evaluating the body is the last step in evaluating the function application as a whole, the continuation points to the next thing (halt computation) as expected.
+
+$$ s_3 = \langle x, \{ x: (\lambda y.y, \emptyset) \}, \textbf{mt} \rangle $$
+
+$s_3$ matches rule 1:
+
 $$ s_4 = \langle \lambda y.y, \emptyset, \textbf{mt} \rangle $$
+
+We have now reached a value with a continuation of \textbf{mt}, so computation halts.
 
 TODO: CESK and CESK* machines
 
