@@ -602,6 +602,62 @@ One technique for static analysis is abstract interpretation, wherein the comput
 
 The level of detail that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
 
+
+\subsection{Deriving abstract interpreters from abstract machines}
+Abstract interpreters can be mechanically derived from abstract machines using a technique presented in \cite{aam}. An \textbf{abstract machine} is a mathematical formalism that models a computing machine. A Turing machine---a finite state machine hooked up to an infinitely long tape from which it can read and write---is an example of an abstract machine, albeit one that is sufficiently different from modern computers (and modern programming languages) that its practical utility in reasoning about real-world languages is limited. While arbitrary computation can be modeled by a system as simple as the untyped lambda calculus, the mathematical definition of the lambda calculus lacks a description of how lambda calculus terms can be evaluated procedurally to produce an atomic value---a topic that is of considerable practical interest. Abstract machines supply the description of how mathematical models of computation are evaluated.
+
+Three abstract machines of increasing resemblance to real-world technology will be presented here:\footnote{The exposition in this section relies heavily on the mathematical description of these machines in \cite{aam}.} the CEK, CESK, and CESK$^*$ machines. Though the language that these machines evaluate (the untyped lambda calculus) is superficially very different from real programming languages, in principle the mechanisms of function definition, application, and lexical closure are the core of most actual languages, and at any rate the lambda calculus is much closer to a modern programming language than the finite transition systems that underlie the computation of a Turing machine are.
+
+The CEK machine has three elements in its state: $c$, an expression in the lambda calculus; $\rho$, an environment that maps from symbols to values; and $\kappa$, a continuation. All values in the lambda calculus are closures, so the codomain of the environment is the set of pairs of lambda functions with environments.
+
+Continuations are mathematical structures that model control flow. Intuitively, a continuation represents what the machine should do next after evaluating the current expression. For the lambda calculus, the sequence of machine operations is very simple, as only function application (of the three syntactic terms) requires any control flow at all: the function is evaluated first, followed by the argument\footnote{The opposite order is also valid.}, and then the body of the function is evaluated in an environment where the parameter is bound to the concrete value of the argument. The machine merely needs to store what the next step is.
+
+In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \kappa)$, $\textbf{fn}((\lambda x.e), \rho, \kappa)$, and $\textbf{mt}$. The first form represents evaluating an argument $e$, and the second form represents evaluating the body of a function. The third form is the empty continuation, which halts execution of the program. In the first two forms, $\rho$ is the environment in which the expression is to be evaluated, and $\kappa$ is the continuation that is to be executed afterwards.
+
+The entirety of the operation of the CEK machine can be described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}.} The first rule is for evaluating variables:
+
+% Evaluating a symbol
+$$ \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
+
+The new expression to evaluate is whatever the variable mapped to in the environment. We replace the old environment with the environment attached the variable's values, to capture the correct behavior of closures. The continuation is preserved since evaluating variables does not involve a change in control flow.
+
+The second rule is for evaluating function applications:
+
+% Evaluating an application
+$$ \langle (e_0 e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
+
+Upon seeing a function application, the first expression to be evaluated is the function that is being applied, so this function ($e_0$ in the formula) is the expression in the output state. The environment in which the function is evaluated is the same in which the function application as a whole is evaluated. The new continuation directs the abstract machine to evaluate the argument next, in the same environment, followed by the original continuation (so that the machine can move on to do what it needs to do next).
+
+The last two rules handle the evaluation of values (which in the lambda calculus are always closures). If the current continuation is of the \textbf{ar} form, the following rule applies:
+
+% Evaluating an argument
+$$ \langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle \to \langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle $$
+
+The current continuation indicates that the argument $e$ is the next thing to be evaluated, so that is set as the expression in the output state. The old environment is replaced with the environment provided by the continuation. After evaluating the argument, we want to evaluate the body of the function, so we provide a \textbf{fn} continuation that encapsulates the function itself, the original environment, and the original continuation.
+
+The last rule applies to evaluating values with an \textbf{fn} continuation:
+
+% Evaluating a function
+$$ \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \to (v, \rho)], \kappa \rangle $$
+
+The body of the function, $e$, is the next expression to be evaluated, so it goes in the expression slot of the output state. The environment is the one indicated by the old continuation, augmented with a binding of the function's parameter to the value of its argument, which we know is in the old expression slot based on the previous rule. Finally, we preserve the old continuation.
+
+In addition to state-mapping rules, an abstract machine needs an \textbf{injection function} that provides its initial state given an expression to evaluate. For the CEK machine, the injection function is simple:
+
+$$ inj_{CEK}(e) = \langle e, \emptyset, \textbf{mt} \rangle $$
+
+The preceding discussion may be clarified by a concrete example. Suppose we want to evaluate the lambda expression $(\lambda x.x\ \lambda y.y)$ (which should evaluate to $\lambda y.y$). We begin by applying $inj_{CEK}$ to get our initial state:
+
+$$ s_0 = \langle (\lambda x.x\ \lambda y.y), \emptyset, \textbf{mt} \rangle $$
+$$ s_1 = \langle \lambda x.x, \emptyset, \textbf{ar}(\lambda y.y, \emptyset, \textbf{mt}) \rangle $$
+$$ s_2 = \langle \lambda y.y, \emptyset, \textbf{fn}(\lambda x.x, \emptyset, \textbf{mt}) \rangle $$
+$$ s_3 = \langle x, {x: (\lambda y.y, \emptyset)}, \textbf{mt} \rangle $$
+$$ s_4 = \langle \lambda y.y, \emptyset, \textbf{mt} \rangle $$
+
+TODO: CESK and CESK* machines
+
+
+\subsection{Abstract interpretation of Racets}
 The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every single variable reference needs a conditional. A simple module like below
 
 \begin{lstlisting}
@@ -634,9 +690,9 @@ The extended \textsc{Racets} implementation presented in section \ref{sec:lang} 
     y))
 \end{lstlisting}
 
-Of course, none of these conditionals are actually necessary, because it is apparent that neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime. TODO: How would abstract interpretation apply here?
+Of course, none of these conditionals are actually necessary, because it is apparent that neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime.
 
-TODO: More details about the abstracting abstract machines approach.
+An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract intrepreter were able to determine that a particular value is never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be eliminated at compile time, improving the runtime performance of the code.
 
 
 
