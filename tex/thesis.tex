@@ -616,29 +616,29 @@ In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \ka
 
 The entirety of the operation of the CEK machine can be described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}.} The first rule is for evaluating variables:
 
-% Evaluating a symbol
+% Evaluating a symbol (CEK)
 $$ \text{1. } \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
 
 The new expression to evaluate is whatever the variable mapped to in the environment. We replace the old environment with the environment attached the variable's values, to capture the correct behavior of closures. The continuation is preserved since evaluating variables does not involve a change in control flow.
 
 The second rule is for evaluating function applications:
 
-% Evaluating an application
-$$ \text{2. } \langle (e_0 e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
+% Evaluating an application (CEK)
+$$ \text{2. } \langle (e_0\ e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
 
 Upon seeing a function application, the first expression to be evaluated is the function that is being applied, so this function ($e_0$ in the formula) is the expression in the output state. The environment in which the function is evaluated is the same in which the function application as a whole is evaluated. The new continuation directs the abstract machine to evaluate the argument next, in the same environment, followed by the original continuation (so that the machine can move on to do what it needs to do next).
 
 The last two rules handle the evaluation of values (which in the lambda calculus are always closures). If the current continuation is of the \textbf{ar} form, the following rule applies:
 
-% Evaluating an argument
+% Evaluating an argument (CEK)
 $$ \text{3. } \langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle \to \langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle $$
 
 The current continuation indicates that the argument $e$ is the next thing to be evaluated, so that is set as the expression in the output state. The old environment is replaced with the environment provided by the continuation. After evaluating the argument, we want to evaluate the body of the function, so we provide a \textbf{fn} continuation that encapsulates the function itself, the original environment, and the original continuation.
 
 The last rule applies to evaluating values with an \textbf{fn} continuation:
 
-% Evaluating a function
-$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \to (v, \rho)], \kappa \rangle $$
+% Evaluating a function (CEK)
+$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \mapsto (v, \rho)], \kappa \rangle $$
 
 The body of the function, $e$, is the next expression to be evaluated, so it goes in the expression slot of the output state. The environment is the one indicated by the old continuation, augmented with a binding of the function's parameter to the value of its argument, which we know is in the old expression slot based on the previous rule. Finally, we preserve the old continuation.
 
@@ -668,11 +668,47 @@ $$ s_4 = \langle \lambda y.y, \emptyset, \textbf{mt} \rangle $$
 
 We have now reached a value with a continuation of \textbf{mt}, so computation halts.
 
-TODO: CESK and CESK* machines
+The CEK machine can be augmented with a store to simulate mutable state. This machine is known as a CESK machine \cite{cesk}. \cite{aam} present a slight modification to the CESK machine, in which continuations are allocated in the store in order to make the machine more amenable to conversion into an abstract interpreter. This machine, presented here, is known as the CESK* machine.
+
+The state of the CESK* machine consists of $c, \rho, \sigma, \kappa$, where $c$ and $\kappa$ are defined as for the CEK machine, $\rho$ is modified to map from symbols to addresses instead of values, and the store $\sigma$ maps from addresses to values.
+
+The injection function for the CESK machine is slightly (but only slightly) more complex than that for the CEK machine:
+
+$$ inj_{CESK*}(e) = \langle e, \emptyset, \{ a_0: \textbf{mt} \}, a_0 \rangle $$
+
+The four rules for the behavior of the CESK* machine are likewise similar.\footnote{These rules are reproduced and slightly modified from Figure 3 on p. 4 of \cite{aam}} Several of the rules make use of an $alloc()$ function, which returns a unique address in the store that has not been used yet.
+
+The first rule, for evaluating variables, is almost identical:
+
+% Evaluating a symbol (CESK*)
+$$ \text{1. } \langle x, \rho, \sigma, a \rangle \to \langle v, \rho', \sigma, a \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
+
+The second rule, for function application, differs only in that the continuation is allocated in the store:
+
+% Evaluating an application (CESK*)
+$$ \text{2. } \langle (e_0\ e_1), \rho, \sigma, a \rangle \to \langle e_0, \rho, \sigma[b \mapsto \textbf{ar}(e_1, \rho, a)], b \rangle \text{ where $b = alloc()$} $$
+
+The third and fourth rules again differ only in the use of the store:
+
+% Evaluating an argument (CESK*)
+$$ \text{3. } \langle v, \rho, \sigma, a \rangle \to \langle e, \rho', \sigma[b \mapsto \textbf{fn}(v, \rho, c)], b \rangle \text{ where $b = alloc()$} $$
+\begin{center}
+	given that $a$ maps to $\textbf{ar}(e, \rho', c)$ in $\sigma$
+\end{center}
+
+% Evaluating a function (CESK*)
+$$ \text{4. } \langle v, \rho, \sigma, a \rangle \to \langle e, \rho'[x \mapsto b], \sigma[b \mapsto (v, \rho)], c \rangle $$
+\begin{center}
+	given that $a$ maps to $\textbf{fn}((\lambda x.e), \rho', c)$ in $\sigma$
+\end{center}
+
+The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow abstract interpretation to proceed more easily.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The motivation is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
+
+TODO: How do we get an abstract interpreter from these abstract machines?
 
 
 \subsection{Abstract interpretation of Racets}
-The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every single variable reference needs a conditional. A simple module like below
+Recall that the original motivation for abstract interpretation was to improve the runtime performance of programs by statically proving facts about the program's semantics that could be used for compile-time optimizations. The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every single variable reference needs a conditional. A simple module like below
 
 \begin{lstlisting}
 #lang s-exp "racets.rkt"
@@ -707,6 +743,8 @@ The extended \textsc{Racets} implementation presented in section \ref{sec:lang} 
 Of course, none of these conditionals are actually necessary, because it is apparent that neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime.
 
 An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract intrepreter were able to determine that a particular value is never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be eliminated at compile time, improving the runtime performance of the code.
+
+Actually deriving an abstract interpreter for \textsc{Racets} (bridging the high-level description in this section with the low-level details in the previous section) is beyond the scope of this undergraduate thesis. See \cite{abstract-inter} for current work in this area.
 
 
 
