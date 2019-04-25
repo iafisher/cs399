@@ -146,6 +146,7 @@ Bob must make two calls to \texttt{obs} to fully resolve the facet's value:
 
 \begin{lstlisting}
 (obs alice-policy "Bob" (obs bob-policy "Bob" location-facet))
+(obs alice-policy "Bob" (obs bob-policy "Bob" location-facet))
 \end{lstlisting}
 
 As before, Bob must ensure that the policy he passes to each \texttt{obs} call matches the policy of the facet. In this case, the outer facet uses Alice's policy and the inner facet uses Bob's policy, so the calls to \texttt{obs} must be organized likewise.
@@ -614,7 +615,7 @@ Continuations are mathematical structures that model control flow. Intuitively, 
 
 In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \kappa)$, $\textbf{fn}((\lambda x.e), \rho, \kappa)$, and $\textbf{mt}$. The first form represents evaluating an argument $e$, and the second form represents evaluating the body of a function. The third form is the empty continuation, which halts execution of the program. In the first two forms, $\rho$ is the environment in which the expression is to be evaluated, and $\kappa$ is the continuation that is to be executed afterwards.
 
-The entirety of the operation of the CEK machine can be described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}.} The first rule is for evaluating variables:
+The entirety of the operation of the CEK machine can be described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
 
 % Evaluating a symbol (CEK)
 $$ \text{1. } \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
@@ -676,7 +677,7 @@ The injection function for the CESK machine is slightly (but only slightly) more
 
 $$ inj_{CESK*}(e) = \langle e, \emptyset, \{ a_0: \textbf{mt} \}, a_0 \rangle $$
 
-The four rules for the behavior of the CESK* machine are likewise similar.\footnote{These rules are reproduced and slightly modified from Figure 3 on p. 4 of \cite{aam}} Several of the rules make use of an $alloc()$ function, which returns a unique address in the store that has not been used yet.
+The four rules for the behavior of the CESK* machine are likewise similar.\footnote{These rules are reproduced and slightly modified from Figure 3 on p. 4 of \cite{aam}.} Several of the rules make use of an $alloc()$ function, which returns a unique address in the store that has not been used yet.
 
 The first rule, for evaluating variables, is almost identical:
 
