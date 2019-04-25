@@ -396,7 +396,7 @@ It is simply not possible to target bare identifiers with a syntactic macro beca
 \subsection{Racets as a language-as-a-library}
 These shortcomings can be averted with \textsc{Racets}'s \texttt{\#lang} mechanism. Source files in Racket typically begin with a \texttt{\#lang racket} declaration. However, other languages may be defined (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}) which reuse some of the syntax and semantics of Racket and modify other parts of it. The semantics, syntax, and even lexical structure can be altered using \texttt{\#lang}.
 
-The language-as-a-library approach \cite{typed-racket} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code and which are much easier to write than an entire new language, since they can reuse all the facilities exposed by the Racket compiler.
+The language-as-a-library approach \cite{lang-as-lib} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code and which are much easier to write than an entire new language, since they can reuse all the facilities exposed by the Racket compiler.
 
 The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form (which wraps all Racket modules), and use a Racket function called \texttt{local-expand} to simplify the module's contents into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}. The language designer then need only provide translations for the small set of core forms that constituted Fully-Expanded Racket.
 
