@@ -145,8 +145,9 @@ Alice observes her nested facet in the usual way:
 Bob must make two calls to \texttt{obs} to fully resolve the facet's value:
 
 \begin{lstlisting}
-(obs alice-policy "Bob" (obs bob-policy "Bob" location-facet))
-(obs alice-policy "Bob" (obs bob-policy "Bob" location-facet))
+(obs alice-policy
+     "Bob"
+     (obs bob-policy "Bob" location-facet))
 \end{lstlisting}
 
 As before, Bob must ensure that the policy he passes to each \texttt{obs} call matches the policy of the facet. In this case, the outer facet uses Alice's policy and the inner facet uses Bob's policy, so the calls to \texttt{obs} must be organized likewise.
@@ -639,7 +640,7 @@ The current continuation indicates that the argument $e$ is the next thing to be
 The last rule applies to evaluating values with an \textbf{fn} continuation:
 
 % Evaluating a function (CEK)
-$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappda) \rangle \to \langle e, \rho'[x \mapsto (v, \rho)], \kappa \rangle $$
+$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappa) \rangle \to \langle e, \rho'[x \mapsto (v, \rho)], \kappa \rangle $$
 
 The body of the function, $e$, is the next expression to be evaluated, so it goes in the expression slot of the output state. The environment is the one indicated by the old continuation, augmented with a binding of the function's parameter to the value of its argument, which we know is in the old expression slot based on the previous rule. Finally, we preserve the old continuation.
 
