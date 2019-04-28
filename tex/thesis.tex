@@ -31,7 +31,7 @@
 \bibliographystyle{acm}
 
 \title{The Ergonomics of Faceted Execution}
-\author{Ian Fisher \\ \\ \\ \\ A thesis submitted in partial fulfillment of the requirements \\ for the degree of Bachelor of Science in Computer Science \\ \\ \\}  % There has got to be a better way to do this.
+\author{Ian Fisher \\ \\ Advised by Kristopher Micinski \\ \\ \\ \\ A thesis submitted in partial fulfillment of the requirements \\ for the degree of Bachelor of Science in Computer Science \\ \\ \\}
 \date{Haverford College \\ 29 April 2018}
 
 \begin{document}
@@ -767,9 +767,11 @@ Actually deriving an abstract interpreter for \textsc{Racets} (bridging the high
 
 
 \section{Conclusion\label{sec:conclusion}}
-This thesis has identified three areas in which the ergonomics of faceted execution could be improved: faceted code is slower than non-faceted code, it is easy to make avoidable mistakes when using the \texttt{obs} form, and faceted code has trouble integrating smoothly with non-faceted code. I have reviewed potential solutions for each of these problems: static analysis by abstract interpretation to reduce runtime overhead, static typing to catch programmer errors, and Racket's \texttt{\#lang} mechanism to ease compatibility with non-faceted code. Additionally, I have demonstrated an essential technique for re-writing the present implementation of \textsc{Racets} to use \texttt{\#lang}. The techniques and theory reviewed in this thesis should contribute to the ergonomics of writing code with faceted execution, and thus to safeguarding the privacy of software users.
+The primary novel contribution of this thesis is the application of the language-as-a-library technique to \textsc{Racets} in order to correctly handle mutable state and improve interoperability with non-faceted code. Two other issues in the ergonomics of faceted execution have been discussed at some length: type safety, and runtime efficiency. I have shown that static typing and abstract interpretation could mitigate these issues.
 
-% TODO: Further research
+Further research may proceed in a number of directions. The presentation of static typing and abstract interpretation in this thesis has been extremely preliminary, and the details of their concrete implementation in \textsc{Racets} or in other implementations of faceted execution will need to be fleshed out. The proof-of-concept of re-writing \textsc{Racets} as a \texttt{\#lang}-style language will need to be extended with the existing macros that implement the primitives of faceted execution.
+
+The theory and techniques reviewed here should contribute to the ergonomics of writing code with faceted execution, and thus in turn to safeguarding the privacy of software users.
 
 
 
