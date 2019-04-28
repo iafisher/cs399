@@ -623,28 +623,49 @@ In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \ka
 The entirety of the operation of the CEK machine is described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
 
 % Evaluating a symbol (CEK)
-$$ \text{1. } \langle x, \rho, \kappa \rangle \to \langle v, \rho', \kappa \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
+$$
+\text{1. }
+\langle x, \rho, \kappa \rangle
+\to
+\langle v, \rho', \kappa \rangle,
+\text{ given that $x$ is bound to $(v, \rho')$ in $\rho$}
+$$
 
 The new expression to evaluate is whatever the variable maps to in the environment. The old environment is replaced with the environment attached the variable's values, to correctly capture the semantics of closures. The original continuation is preserved, since evaluating variables does not involve a change in control flow.
 
 The second rule is for evaluating function applications:
 
 % Evaluating an application (CEK)
-$$ \text{2. } \langle (e_0\ e_1), \rho, \kappa \rangle \to \langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle $$
+$$
+\text{2. }
+\langle (e_0\ e_1), \rho, \kappa \rangle
+\to
+\langle e_0, \rho, \textbf{ar}(e_1, \rho, \kappa) \rangle
+$$
 
 The first expression to be evaluated in a function application is the function itself, so this function ($e_0$ in the formula) becomes the expression in the output state. The environment in which the function is evaluated is the same in which the function application as a whole is evaluated, so $\rho$ is preserved. The new continuation directs the abstract machine to evaluate the argument next, in the same environment, followed by the original continuation $\kappa$ (so that the machine can move on to do what it needs to do next).
 
 The last two rules handle the evaluation of values (which in the lambda calculus are always closures). If the current continuation is of the \textbf{ar} form, the following rule applies:
 
 % Evaluating an argument (CEK)
-$$ \text{3. } \langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle \to \langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle $$
+$$
+\text{3. }
+\langle v, \rho, \textbf{ar}(e, \rho', \kappa) \rangle
+\to
+\langle e, \rho', \textbf{fn}(v, \rho, \kappa) \rangle
+$$
 
 The current continuation indicates that the argument $e$ is the next thing to be evaluated, so that becomes the expression in the output state. The old environment is replaced with the environment provided by the continuation. After evaluating the argument, we want to evaluate the body of the function, so we provide a \textbf{fn} continuation that encapsulates the function itself, the original environment, and the original continuation.
 
 The last rule applies to evaluating values with an \textbf{fn} continuation:
 
 % Evaluating a function (CEK)
-$$ \text{4. } \langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappa) \rangle \to \langle e, \rho'[x \mapsto (v, \rho)], \kappa \rangle $$
+$$
+\text{4. }
+\langle v, \rho, \textbf{fn}((\lambda x.e), \rho', \kappa) \rangle
+\to
+\langle e, \rho'[x \mapsto (v, \rho)], \kappa \rangle
+$$
 
 The body of the function, $e$, is the next expression to be evaluated, so it goes in the expression slot of the output state. The environment is the one indicated by the old continuation, augmented with a binding of the function's parameter to the value of its argument, which must be in the old expression slot based on the previous rule. Finally, we preserve the old continuation.
 
@@ -693,26 +714,49 @@ The four rules for the behavior of the CESK* machine are likewise similar.\footn
 The first rule, for evaluating variables, is almost identical:
 
 % Evaluating a symbol (CESK*)
-$$ \text{1. } \langle x, \rho, \sigma, a \rangle \to \langle v, \rho', \sigma, a \rangle, \text{ given that $x$ is bound to $(v, \rho')$ in $\rho$} $$
+$$
+\text{1. }
+\langle x, \rho, \sigma, a \rangle
+\to
+\langle v, \rho', \sigma, a \rangle,
+\text{ given that $x$ is bound to $(v, \rho')$ in $\rho$}
+$$
 
 The second rule, for function application, differs only in that the continuation is allocated in the store:
 
 % Evaluating an application (CESK*)
-$$ \text{2. } \langle (e_0\ e_1), \rho, \sigma, a \rangle \to \langle e_0, \rho, \sigma[b \mapsto \textbf{ar}(e_1, \rho, a)], b \rangle \text{ where $b = alloc()$} $$
+$$
+\text{2. }
+\langle (e_0\ e_1), \rho, \sigma, a \rangle
+\to
+\langle e_0, \rho, \sigma[b \mapsto \textbf{ar}(e_1, \rho, a)], b \rangle
+\text{ where $b = alloc()$}
+$$
 
 The third and fourth rules again differ only in the use of the store:
 
 % Evaluating an argument (CESK*)
-$$ \text{3. } \langle v, \rho, \sigma, a \rangle \to \langle e, \rho', \sigma[b \mapsto \textbf{fn}(v, \rho, c)], b \rangle \text{ where $b = alloc()$} $$
-\begin{center}
-	given that $a$ maps to $\textbf{ar}(e, \rho', c)$ in $\sigma$
-\end{center}
+$$
+\text{3. }
+\langle v, \rho, \sigma, a \rangle
+\to
+\langle e, \rho', \sigma[b \mapsto \textbf{fn}(v, \rho, c)], b \rangle
+\text{ where $b = alloc()$}
+$$
+$$
+\text{given that $a$ maps to $\textbf{ar}(e, \rho', c)$ in $\sigma$}
+$$
 
 % Evaluating a function (CESK*)
-$$ \text{4. } \langle v, \rho, \sigma, a \rangle \to \langle e, \rho'[x \mapsto b], \sigma[b \mapsto (v, \rho)], c \rangle $$
-\begin{center}
-	given that $a$ maps to $\textbf{fn}((\lambda x.e), \rho', c)$ in $\sigma$
-\end{center}
+$$
+\text{4. }
+\langle v, \rho, \sigma, a \rangle
+\to
+\langle e, \rho'[x \mapsto b], \sigma[b \mapsto (v, \rho)], c \rangle
+$$
+$$
+\text{given that $a$ maps to $\textbf{fn}((\lambda x.e), \rho', c)$ in $\sigma$}
+$$
 
 The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow abstract interpretation to proceed more easily.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
 
