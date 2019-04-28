@@ -38,7 +38,7 @@
 \maketitle
 
 \begin{abstract}
-	This thesis reviews faceted execution, a programming-language mechanism for enforcing privacy policies. I discuss several issues with the use of faceted execution in real-world software development (efficiency, type safety, compatibility with non-faceted code), and review methods of mitigating these issues (abstract interpretation, static typing, Racket's \texttt{\#lang} mechanism). I present a proof-of-concept of a module-rewriting technique for \textsc{Racets} \cite{racets}, an existing implementation of faceted execution in Racket.
+	This thesis reviews several challenges in implementing faceted execution, a programming-language mechanism for enforcing privacy policies. I present a proof-of-concept of a module-rewriting technique for correctly handling mutable state in \textsc{Racets} \cite{racets}, an existing implementation of faceted execution in Racket. I also discuss how Racket's \texttt{\#lang} mechanism, static typing, and abstract interpretation could improve the interoperability, safety, and efficiency of faceted code.
 \end{abstract}
 
 \newpage
