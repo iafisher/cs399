@@ -716,11 +716,58 @@ $$ \text{4. } \langle v, \rho, \sigma, a \rangle \to \langle e, \rho'[x \mapsto 
 
 The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow abstract interpretation to proceed more easily.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
 
-The way that the abstract interpreter works is by treating the store as a container for sets of values rather than single values, so that an assignment of $\lambda x.x$ to address $a$ in the store, followed by an assignment of $\lambda y.(y y)$ to the same address, would result in $a$ storing the set $\{ \lambda x.x, \lambda y.(y\ y) \}$ instead of the single value $\lambda y.(y\ y)$, as it would under regular interpretation.
+Formally, the abstract CESK* interpreter is a 4-tuple $c, \rho, \hat{\sigma}, a$, where $c$, $\rho$ and $a$ are defined the same as for the CESK* machine, and $\hat{\sigma}$ maps from addresses to sets of values instead of single values.
 
-An abstract machine runs by iteratively applying the transition rules to yield a new state from its current state, continuing until a halting configuration is reached. At any given point, the abstract machine is in a single state. An abstract interpreter, by contrast, is in a set of states. It proceeds by applying the transition rules (modified to produce sets) to each individual state, and taking the union of the results. When this process results in the same set of states as before (i.e., when it has reached a fixed point), the abstract interpreter terminates.
+The behavior of the abstract CESK* interpreter is defined by four transition rules. Some of these rules make use of an allocation function $\widehat{alloc} : \hat{\Sigma} \times Kont \to Addr$, which takes in an abstract interpreter state and a continuation in order to decide what address to return.
 
-The interpreter must enforce that the store is finite in order to guarantee termination. This is achieved by modified the allocator function $alloc()$ so that its co-domain is finite. One simple way to change $alloc()$ is to have it always return the same address. While this does guarantee termination and likely speeds up the abstract interpretation, it comes at the cost of precision of analysis, since all stored values in the program are treated as the same. More sophisticated allocation techniques strike a better balance of precision and simplicity.
+The first transition rule, for variables, is essentially identical to the analogous rule for the CESK* machine:
+
+% Evaluating a symbol (abstract CESK*)
+$$
+\text{1. }
+\langle x, \rho, \hat{\sigma}, a \rangle
+\to
+\langle v, \rho', \hat{\sigma}, a \rangle,
+\text{ given that $(v, \rho') \in \rho(x)$}
+$$
+
+The remaining three rules are where the important difference between the CESK* machine and the abstract CESK* interpreter come to light. Rather than assigning directly to the store, the new mapping is unioned with the existing store, so that it contains both the new mapping and any old mapping that the new mapping might have otherwise overwritten.
+
+% Evaluating an application (abstract CESK*)
+$$
+\text{2. }
+\langle (e_0\ e_1), \rho, \hat{\sigma}, a \rangle
+\to
+\langle e_0, \rho, \hat{\sigma} \cup [b \mapsto \textbf{ar}(e_1, \rho, a)], b \rangle
+\text{ where $b = \widehat{alloc}(\varsigma, \kappa)$}
+$$
+% Evaluating an argument (abstract CESK*)
+$$
+\text{3. }
+\langle v, \rho, \hat{\sigma}, a \rangle
+\to
+\langle e, \rho', \hat{\sigma} \cup [b \mapsto \textbf{fn}(v, \rho, c)], b \rangle
+\text{ where $b = \widehat{alloc}(\varsigma, \kappa)$}
+$$
+$$
+\text{given that } \textbf{ar}(e, \rho', c) \in \hat{\sigma}(a)
+$$
+% Evaluating a function (CESK*)
+$$
+\text{4. }
+\langle v, \rho, \hat{\sigma}, a \rangle
+\to
+\langle e, \rho'[x \mapsto b], \hat{\sigma} \cup [b \mapsto (v, \rho)], c \rangle
+$$
+$$
+\text{given that } \textbf{fn}((\lambda x.e), \rho', c) \in \hat{\sigma}(a)
+$$
+
+Other than modifying the store in the manner described above, the transition rules for the abstract CESK* interpreter are more or less the same as for the CESK* machine.
+
+An abstract machine runs by iteratively applying the transition rules to yield a new state from its current state, continuing until a halting configuration is reached. At any given point, the abstract machine is in a single state. An abstract interpreter, by contrast, is in a set of states. It proceeds by applying the transition rules to each individual state, and taking the union of the results. When this process results in the same set of states as before (i.e., when it has reached a fixed point), the abstract interpreter terminates.
+
+The interpreter must enforce that the store is finite in order to guarantee termination. This is achieved by modified the allocator function $\widehat{alloc}$ so that its co-domain is finite. One simple way to ensure this is to have $\widehat{alloc}$ always return the same address. While this does guarantee termination and likely speeds up the abstract interpretation, it comes at the cost of precision of analysis, since all stored values in the program are treated as the same. More sophisticated allocation techniques strike a better balance of precision and simplicity.
 
 When the abstract interpreter has terminated, its store can be inspected to reason about the semantics of the program. For example, if every element of the set that address $a$ maps to is a negative number, then we can conclude that the variable or variables corresponding to $a$ will always be negative.
 
