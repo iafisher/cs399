@@ -720,7 +720,7 @@ Formally, the abstract CESK* interpreter is a 4-tuple $c, \rho, \hat{\sigma}, a$
 
 The behavior of the abstract CESK* interpreter is defined by four transition rules. Some of these rules make use of an allocation function $\widehat{alloc} : \hat{\Sigma} \times Kont \to Addr$, which takes in an abstract interpreter state and a continuation in order to decide what address to return.
 
-The first transition rule, for variables, is essentially identical to the analogous rule for the CESK* machine:
+The first transition rule, for variables, is essentially identical to the analogous rule for the CESK* machine:\footnote{These rules are reproduced from Figure 5 on p. 5 of \cite{aam} and modified to apply to the CESK* interpreter instead of the time-stamped CESK* interpreter originally presented in the paper.}
 
 % Evaluating a symbol (abstract CESK*)
 $$
