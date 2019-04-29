@@ -281,7 +281,7 @@ A macro is invoked just like a regular function:
 (identity x)
 \end{lstlisting}
 
-At compile time, the Racket compiler searches through the source code for uses of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more more macros are left in the source code. This process is known as \textit{expansion}.
+At compile time, the Racket compiler searches through the source code for uses of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more more macros are left in the source code. This process is known as \textit{macro expansion}.
 
 New syntax objects can be constructed with the \texttt{syntax} function or its abbreviation, \texttt{\#'}:
 
@@ -608,7 +608,6 @@ Another practical problem with faceted execution is that faceted code can run si
 
 One technique for static analysis is abstract interpretation \cite{abstract-inter}, wherein the computation of a program is modeled with abstract objects (e.g., the abstract category ``negative number'' instead of the concrete value $-10$) so that semantic properties of the program can be reasoned about \cite{ai-original}.
 
-The level of precision that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
 
 
 \subsection{Deriving abstract interpreters from abstract machines}
@@ -760,7 +759,9 @@ $$
 \text{given that $a$ maps to $\textbf{fn}((\lambda x.e), \rho', c)$ in $\sigma$}
 $$
 
-The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow abstract interpretation to proceed more easily.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
+The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow the construction of an abstract interpretation from the CESK* machine to proceed more smoothly.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
+
+The abstract CESK* interpreter is defined similarly to the CESK* machine, except that the store maps to sets of values instead of concrete values, and it transitions between sets of machine states instead of single states. The interpreter continues transitioning until it reaches a fixed-point, when applying its transition function to each individual states yields the original set. Once the abstract CESK* interpreter has terminated, its store can be inspected to determine semantic properties of the program.
 
 Formally, the abstract CESK* interpreter is a 4-tuple $(c, \rho, \hat{\sigma}, a)$, where $c$, $\rho$ and $a$ are defined the same as for the CESK* machine, and $\hat{\sigma}$ maps from addresses to sets of values instead of single values.
 
@@ -811,11 +812,10 @@ $$
 
 Other than modifying the store in the manner described above, the transition rules for the abstract CESK* interpreter are more or less the same as for the CESK* machine.
 
-An abstract machine runs by iteratively applying the transition rules to yield a new state from its current state, continuing until a halting configuration is reached. At any given point, the abstract machine is in a single state. An abstract interpreter, by contrast, is in a set of states. It proceeds by applying the transition rules to each individual state, and taking the union of the results. When this process results in the same set of states as before (i.e., when it has reached a fixed point), the abstract interpreter terminates.
-
-The interpreter must enforce that the store is finite in order to guarantee termination. This is achieved by ensuring the co-domain of the allocator function $\widehat{alloc}$ is finite. One simple way to ensure this is to have $\widehat{alloc}$ always return the same address. While this does guarantee termination, it comes at the cost of precision of analysis, since all stored values in the program are treated as the same. More sophisticated allocation techniques strike a better balance of precision and simplicity.
-
 When the abstract interpreter has terminated, its store can be inspected to reason about the semantics of the program. For example, if every element of the set that address $a$ maps to is a negative number, then we can conclude that the variable or variables corresponding to $a$ will always be negative.
+
+% TODO: Awkward
+We are now in a position to understand why store-allocated continuations are crucial for converting the CESK* machine into an abstract interpreter. Abstract interpretation must terminate to be useful in practice. One way of enforcing termination is by keeping the store finite, which can be accomplished by defining the allocation function $\widehat{alloc}$ in such a way that its co-domain is finite. If continuations were outside of the store, they would be recursive structures that could potentially nest infinitely. Once moved to the store, their finite-ness is guaranteed by the broader finite-ness of the store itself.
 
 
 \subsection{Abstract interpretation of Racets}
@@ -855,6 +855,8 @@ Recall that the original motivation for abstract interpretation was to improve t
 Of course, none of these conditionals are actually necessary, because neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime.
 
 An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract interpreter were able to determine that a particular value was never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be eliminated at compile time.
+
+The level of precision that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
 
 Actually deriving an abstract interpreter for \textsc{Racets} (bridging the high-level description in this section with the low-level details in the previous section) is beyond the scope of this undergraduate thesis. See \cite{abstract-inter} for current work in this area.
 
