@@ -390,18 +390,18 @@ Note that the problem is not that \texttt{x} is invisibly transformed into a fac
 
 One might imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racet} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
 
-The second issue is that \textsc{Racets} may interfere with other macros, for instance if the programmer redefined the \texttt{\#\%app} form themselves. As it turns out, the same approach that solves the previous issue addresses this issue as well.
+The second issue is that \textsc{Racets} may interfere with other macros, for instance if the programmer redefined the \texttt{\#\%app} form themselves. As it turns out, the same approach---the language-as-a-library approach---that solves the previous issue addresses this issue as well.
 
 
-\subsection{Racets as a language-as-a-library}
-All Racket files begin with a \texttt{\#lang} declaration. Typically, \texttt{\#lang racket} is used, but the declaration may be overridden to refer to a custom-defined language (e.g., \texttt{\#lang typed/racket} \cite{typed-racket}). This ``\texttt{\#lang} language'' has full control over the semantics, syntax and even lexical structure of the source code.
+\subsection{Racets as a language-library}
+All Racket files begin with a \texttt{\#lang racket} declaration. The \texttt{\#lang} statement may be used to declare other languages, e.g. \texttt{\#lang typed/racket} for Typed Racket \cite{typed-racket}, and it may be used to delegate parsing of the file to another Racket file. In the latter case, it is written as \texttt{\#lang s-exp "m.rkt"}, where \texttt{m.rkt} is the name of the Racket file to which parsing has been delegated. \texttt{m.rkt} defines syntactic macros which are used in the expansion of the file that includes the \texttt{\#lang s-exp "m.rkt"} declaration.
 
-The language-as-a-library approach \cite{lang-as-lib} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code, and which are much easier to write than an entire new language, since they can reuse all the facilities exposed by the Racket compiler. The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form , which implicitly or explicitly wraps all Racket modules, so that the entire source code of the module can be intercepted. The source code can then be passed to a Racket function called \texttt{local-expand}, which invokes the macro expansion process to expand the source code into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}, expanding all user-defined macros along the way.
+The languages-as-libraries approach \cite{lang-as-lib} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code, and which are much easier to write than an entire new language, since they can reuse all the facilities exposed by the Racket compiler. The key idea of languages-as-libraries is to override the \texttt{\#\%module-begin} form , which implicitly or explicitly wraps all Racket modules, so that the entire source code of the module can be intercepted. The source code can then be passed to a Racket function called \texttt{local-expand}, which invokes the macro expansion process to expand the source code into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}, expanding all user-defined macros along the way.
 
-The \texttt{\#lang} language then only needs to provide translations for the small set of core forms that constitute Fully-Expanded Racket, rather than the much larger set of forms that may appear in regular Racket, and does not need to worry about name conflicts with user-defined macros, since they have already been expanded by \texttt{local-expand}.
+The language-library then only needs to provide translations for the small set of core forms that constitute Fully-Expanded Racket, rather than the much larger set of forms that may appear in regular Racket, and does not need to worry about name conflicts with user-defined macros, since they have already been expanded by \texttt{local-expand}.
 
 
-\subsubsection{Small example of a language-as-a-library}
+\subsubsection{Small example of a language-library}
 The following minimal but complete example of the languages-as-libraries idea prints out the fully-expanded abstract syntax tree of a program before running it normally:
 
 \begin{lstlisting}
@@ -428,7 +428,7 @@ The following minimal but complete example of the languages-as-libraries idea pr
           (rename-out [module-begin #%module-begin]))
 \end{lstlisting}
 
-If this program were saved in a file called \texttt{print-ast.rkt}, then other files could be written in the language by beginning with \texttt{\#lang s-exp "print-ast.rkt"} instead of \texttt{\#lang racket}.
+If this program were saved in a file called \texttt{print-ast.rkt}, then other files could be written in the language by beginning with \texttt{\#lang s-exp "print-ast.rkt"}.
 
 The file \texttt{print-ast.rkt} begins with the standard \texttt{\#lang racket} declaration, since it itself is written in Racket. It then defines a macro called \texttt{module-begin} which rewrites its argument to be
 
@@ -441,7 +441,7 @@ The file \texttt{print-ast.rkt} begins with the standard \texttt{\#lang racket} 
 \noindent where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object. The macro then outputs a \texttt{\#\%plain-module-begin} form (rather than a \texttt{\#\%module-begin}, to avoid infinite recursion) that wraps the original source syntax, after a call to \texttt{displayln} that prints at runtime the actual syntax object that was generated at compile-time.
 
 
-\subsubsection{Larger example of a language-as-a-library}
+\subsubsection{Larger example of a language-library}
 As a proof-of-concept of implementing Racets with the language-as-a-library approach, this section presents a library called \texttt{wrap-ident.rkt} that rewrites identifiers in the source code in roughly the manner that the real \textsc{Racets} implementation requires.
 
 The effect of the \texttt{wrap-ident.rkt} module is to re-write the syntax tree so that
