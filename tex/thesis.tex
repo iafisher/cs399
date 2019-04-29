@@ -388,14 +388,18 @@ Implementing \textsc{Racets} using macros suffers from two shortcomings: certain
 To correctly handle \texttt{set!} forms with faceted values, the \textsc{Racets} system needs to wrap (some) identifiers with extra conditional logic. To see why, consider the following code snippet:
 
 \begin{lstlisting}
-(if k
+(define x 0)
+
+(if fct
   (set! x 100)
-  (set! x 0))
+  (set! x 50))
+
+(square-root x)
 \end{lstlisting}
 
-Suppose that \texttt{k} is a facet belonging to Alice whose high-confidentiality value is true and whose low-confidentiality value is false. Upon execution of the \texttt{if} statement, the value of \texttt{x} will be a box containing \texttt{(fac alice-policy 100 0)}. However, the code is written as if \texttt{x} were an integer, so if at a later point some arithmetic operation were attempted on \texttt{x}, it would fail, because \texttt{x} is in fact a box and not an integer.
+Suppose that \texttt{fct} is a facet belonging to Alice whose high-confidentiality value is true and whose low-confidentiality value is false. Upon execution of the \texttt{if} statement, the value of \texttt{x} will be a box containing \texttt{(fac alice-policy 100 50)}. However, \texttt{square-root} expects an integer argument, and not a box, so the call to it on line 7 will fail. Note that the problem is not that \texttt{x} is invisibly transformed into a facet, which happens frequently in policy-agnostic faceted code and is handled by the mechanisms of faceted execution, but that it becomes a box containing a facet.
 
-Note that the problem is not that \texttt{x} is invisibly transformed into a facet, which happens frequently in policy-agnostic faceted code and is handled by the mechanisms of faceted execution, but that it becomes a box containing a facet. To handle this case, all bare identifiers must be wrapped in logic that checks if it is a box containing a facet, and unboxes it if it is.
+A simple, brute-force method of handling cases like these is to wrap all bare identifiers in conditional logic that checks if the identifier's value is a box containing a facet, and unboxes it if it is.
 
 One might imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racet} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
 
