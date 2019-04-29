@@ -37,7 +37,7 @@
 \maketitle
 
 \begin{abstract}
-	This thesis reviews several challenges in the implementation and use of faceted execution, a programming-language mechanism for enforcing privacy policies. I present a proof-of-concept of a module-rewriting technique for correctly handling mutable state in \textsc{Racets} \cite{racets}, an existing implementation of faceted execution in Racket. I also discuss how Racket's \texttt{\#lang} mechanism, static typing, and abstract interpretation could improve the interoperability, safety, and efficiency of faceted code.
+	This thesis reviews several challenges in the use and implementation of faceted execution, a programming-language mechanism for enforcing privacy policies. I present a proof-of-concept of a module-rewriting technique for correctly handling mutable state in \textsc{Racets} \cite{racets}, an existing implementation of faceted execution in Racket, and I discuss how static typing and abstract interpretation could improve the safety and efficiency of faceted code.
 \end{abstract}
 
 \newpage
@@ -50,17 +50,17 @@
 \subsection{Faceted execution\label{sec:facets}}
 Many software applications handle data that is protected by a privacy policy. On a social media website, for instance, a user's contact information may only be visible to the user's friends, while their name and profile picture may be public. Beyond social media, in industries like banking and healthcare the proper enforcement of privacy policies has serious legal and ethical implications. However, implementing privacy policies in code can be error-prone, as the privacy policies tend to become entangled with the application logic, and a significant proportion of the code ends up handling sensitive information.
 
-Faceted execution is a programming-language mechanism that eases the implementation of privacy policies by decoupling the policies from the application's logic. Only a small percentage of the code in an application that uses faceted execution explicitly handles privacy policies. The rest of the code can be written naively, while remaining secure. Faceted execution is thus an example of policy-agnostic programming \cite{faceted}.
+Faceted execution is a programming-language mechanism that eases the implementation of privacy policies by decoupling the policies from the application's logic. Only a small percentage of the code in an application that uses faceted execution explicitly deals with privacy policies. The rest of the code can be written naively, while remaining secure. Faceted execution is thus an example of policy-agnostic programming \cite{faceted}.
 
-The cornerstone of faceted execution is a data structure called the facet. A facet is a tuple of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. The actual value of the data to be protected is placed in $v_H$, and some default value like $0$ or \texttt{null} is placed in $v_L$. $v_H$ can only be accessed by observers that satisfy the policy identified by the facet's label; other observers can see only $v_L$.
+The cornerstone of faceted execution is a data structure called the facet. A facet is a tuple of the form $\langle l\ ?\ v_H : v_L \rangle$ where $l$ is a label, $v_H$ is the high-confidentiality value, and $v_L$ is the low-confidentiality value. The actual value of the data to be protected is placed in $v_H$, and some default, non-private value like $0$ or \texttt{null} is placed in $v_L$. $v_H$ can only be accessed by observers that satisfy the policy identified by the facet's label; other observers can see only $v_L$.
 
 Researchers have pursued different strategies for implementing faceted execution. One strategy is to design a new programming language with faceted-execution primitives built-in. The Jeeves programming language is an example of this approach \cite{jeeves}. Another strategy is to integrate faceted execution into an existing language. The \textsc{Racets} programming language \cite{racets} adopts this strategy, by augmenting the Racket language with syntactic macros.
 
-The rest of section \ref{sec:intro} reviews the mechanics of faceted execution in \textsc{Racets} (though many of the concepts are more generally applicable). Section \ref{sec:lang} presents a proof-of-concept of a module-rewriting technique that fixes erroneous handling of certain constructions involving mutable state, and improves the interoperability of \textsc{Racets} with non-faceted code. Sections \ref{sec:types} and \ref{sec:ai} review how static typing and abstract interpretation, respectively, could improve the ergonomics of writing faceted code. Section \ref{sec:conclusion} concludes the paper and offers suggestions for further research.
+The rest of section \ref{sec:intro} reviews the mechanics of faceted execution in \textsc{Racets} (though many of the concepts are more generally applicable). Section \ref{sec:lang} presents a proof-of-concept of a module-rewriting technique that fixes erroneous handling of certain constructions involving mutable state. Sections \ref{sec:types} and \ref{sec:ai} review how static typing and abstract interpretation, respectively, could improve the safety and efficiency of faceted code. Section \ref{sec:conclusion} concludes the paper and offers suggestions for further research.
 
 
 \subsubsection{Core forms of faceted execution}
-Policies, which control access to sensitive data, are created with the \texttt{let-label} form in \textsc{Racets}:
+Privacy policies are represented in \textsc{Racets} as predicates which take an argument and return a boolean value indicating whether the argument satifies the policy or not. They are declared with the \texttt{let-label} form:
 
 \begin{lstlisting}
 (define alice-policy
@@ -79,7 +79,7 @@ A faceted data value is created with the \texttt{fac} form:
 
 \texttt{my-facet} is defined with Alice's policy, the high-confidentiality value $42$, and the low-confidentiality value $0$.
 
-The \texttt{obs} form is used to view the value of a facet. The first argument to \texttt{obs} is the policy itself. The second argument is a token to pass to the policy predicate, which is often a string identifying the role of the entity trying to observe the facet. The third argument is the facet.
+The \texttt{obs} form is used to view the value of a facet. The first argument to \texttt{obs} is the policy. The second argument is a token to pass to the policy predicate, which is often a string identifying the role of the entity observing the facet. The third argument is the facet itself.
 
 \begin{lstlisting}
 (obs alice-policy "Alice" my-facet)
@@ -91,7 +91,7 @@ The expression above will evaluate to $42$, as the argument \texttt{"Alice"} sat
 (obs alice-policy "Bob" my-facet)
 \end{lstlisting}
 
-The policy passed to \texttt{obs} must match the policy that the facet was created with. In the case that the facets do not match, \texttt{obs} functions as a no-op. Each of the two calls to \texttt{obs} below, for instance, will return \texttt{my-facet} unchanged, since \texttt{my-facet} uses Alice's policy and not Bob's.
+The policy passed to \texttt{obs} must match the policy that the facet was created with. In the case that the policies do not match, \texttt{obs} is a no-op. Each of the two calls to \texttt{obs} below, for instance, will return \texttt{my-facet} unchanged, since \texttt{my-facet} uses Alice's policy and not Bob's.
 
 \begin{lstlisting}
 (obs bob-policy "Alice" my-facet)
@@ -102,18 +102,18 @@ The \texttt{let-label}, \texttt{fac}, and \texttt{obs} forms expose the basic fu
 
 
 \subsubsection{Passing facets to functions}
-A major advantage of faceted execution is that policy-naive code can be applied to faceted values. Suppose that a square function were defined as follows
+A major advantage of faceted execution is that policy-naive code can be applied to faceted values. Suppose that a square function were defined as follows:
 
 \begin{lstlisting}
 (define (square x) (* x x))
 \end{lstlisting}
 
-Under normal circumstances, a function call like \texttt{(square (fac p 4 0))} would fail, because \texttt{square} expects an argument of a numeric type, not a facet. However, in \textsc{Racets}, this function call is invisibly transformed to become \texttt{(fac p (square 4) (square 0))}, distributing the function application across the two values of the facet, and preserving the data's privacy policy in the return value.
+\texttt{square} pays no special regard to privacy considerations---it is written exactly as it would be in an application with no privacy policies at all. Under normal circumstances, \texttt{(square (fac p 4 0))} would fail, because \texttt{square} expects a numeric argument, not a facet. However, in \textsc{Racets}, this function call is invisibly transformed to become \texttt{(fac p (square 4) (square 0))}, distributing the function application across the two values of the facet, and preserving the data's privacy policy in the return value.
 
-This transformation, which applies to all function applications in \textsc{Racets}, ensures that functions like \texttt{square} can be applied to faceted values even when written as they normally would be in non-faceted code.
+This transformation, which applies to all function applications in \textsc{Racets}, ensures that functions like \texttt{square} can be applied to faceted values even when written for non-faceted values.
 
 
-\subsubsection{An example of nested facets}
+\subsubsection{Nested facets}
 Faceted values may be nested for more finely-grained control over the available views of data. While a single facet encloses only two views of the data, a nested facet may enclose an arbitrary number of views. For example, Alice could define a nested facet that specifies her location in three degrees of granularity:
 
 \begin{lstlisting}
@@ -161,7 +161,7 @@ Bob must make two calls to \texttt{obs} to fully resolve the facet's value:
 As before, Bob must ensure that the policy he passes to each \texttt{obs} call matches the policy of the facet. In this case, the outer facet uses Alice's policy and the inner facet uses Bob's policy, so the calls to \texttt{obs} must be organized likewise.
 
 
-\subsubsection{An example of faceted structs}
+\subsubsection{Faceted structs}
 Compound data structures such as structs may be faceted. However, the behavior of faceted structs in \textsc{Racets} is somewhat counterintuitive. Take the following example:
 
 \begin{lstlisting}
@@ -181,13 +181,13 @@ The call to the \texttt{employee} constructor is handled by \textsc{Racets} the 
 A surprising consequence is that \texttt{obs} is required to observe the name field (and any other field) of the \texttt{employee} object, even though it was not explicitly faceted in the constructor.
 
 \begin{lstlisting}
-(employee-name (obs bob-policy "Bob" bob))
+(obs bob-policy "Bob" (employee name bob))
 \end{lstlisting}
 
 \textsc{Racets} programs must take care to observe this subtlety when working with faceted structs.
 
 
-\subsubsection{An example of faceted lists}
+\subsubsection{Faceted lists}
 Using faceted values with lists involves similar complications. Consider the following example:
 
 \begin{lstlisting}
@@ -215,7 +215,7 @@ Then the value of the list would be
   (fac alice-policy (list 0 84) (list 0 0)))
 \end{lstlisting}
 
-\noindent encompassing four different possibilities: satisfying both Alice and Bob's policies, satisfying one or the other, or satisfying neither. The tree in figure \ref{figure:nested-list} illustrates this structure diagrammatically.
+\noindent encompassing four different possibilities: satisfying both Alice and Bob's policies, satisfying only Alice's policy, satisfying only Bob's policy, or satisfying neither. The tree in figure \ref{figure:nested-list} illustrates this structure diagrammatically.
 
 \begin{figure}[h]
 \begin{center}
@@ -252,17 +252,17 @@ Programmers may find it useful to convert a faceted list into a list of non-face
         arg))))])
 \end{lstlisting}
 
-\texttt{obs-list} takes in a faceted list, a list of policies which must correspond index-by-index to the policies attached to the elements of the faceted list,\footnote{Alternatively, if all elements of the list use the same policy, \texttt{obs-list} could be modified to take a single policy rather than a list.} and an argument to pass to the policy predicates. It traverses the policy tree tail-recursively, observing a single policy at each step.
+\texttt{obs-list} takes in a faceted list, a list of policies which must correspond index-by-index to the policies attached to the elements of the faceted list (i.e., so that the $i$'th policy corresponds to the $i$'th facet in the list),\footnote{Alternatively, if all elements of the list use the same policy, \texttt{obs-list} could be modified to take a single policy rather than a list of policies.} and an argument to pass to the policy predicates. It traverses the policy tree tail-recursively, observing a single facet at each step.
 
-This section and the previous one have illustrated usability issues with the interaction of faceted execution and data structures, stemming from the generic treatment of faceted function application. For the sake of programming ergonomics, future implementations of faceted execution may wish to not treat functional application quite so generically, so as to allow structure-creating forms like \texttt{list} and struct constructors to behave more intuitively with faceted arguments.
+This section and the previous one have illustrated usability issues with the interaction of faceted execution and data structures, stemming from the generic treatment of faceted function application. For the sake of programming ergonomics, future implementations of faceted execution may wish to not treat function application quite so generically, so as to allow structure-creating forms like \texttt{list} and struct constructors to behave more intuitively with faceted arguments.
 
 
 \subsection{Syntactic macros}
 Since syntactic macros figure heavily in the implementation of \textsc{Racets}, a brief introduction to the Racket macro system is given here. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive treatment.
 
-A syntactic macro is a procedure that transforms the syntax of a program prior to execution. Syntactic macros allow programmers to define new syntactic structures without having to modify the language's parser.
+A syntactic macro is a syntax-transforming procedure that runs at compile-time. Syntactic macros allow programmers to define new syntactic structures without having to modify the language's parser.
 
-At compile time, the Racket compiler searches through the source code for uses of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more more macros are left. This process is known as \textit{macro expansion}.
+At compile time, the Racket compiler searches through the source code for invocations of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more are left. This process is known as \textit{macro expansion}.
 
 The definition of a macro resembles a function that receives a syntax object as input and returns another syntax object as output, except that \texttt{define-syntax} is used instead of \texttt{define}. The following macro uses the \texttt{syntax} constructor for syntax objects to return a new syntactic form, ignoring its input:
 
@@ -279,22 +279,23 @@ A macro is invoked just like a regular function:
 (say-hello (+ 2 2))
 \end{lstlisting}
 
-Unlike a regular function, a macro's argument is a syntax tree rather than a concrete value. In the call to \texttt{say-hello} above, the \texttt{stx} parameter would be bound to the entire syntax object for \texttt{(say-hello (+ 2 2))}, and \textit{not} the concrete value 4.
+Unlike a regular function, a macro's argument is a syntax tree rather than a concrete value. In the call to \texttt{say-hello} above, the \texttt{stx} parameter would be bound to the entire syntax object of \texttt{(say-hello (+ 2 2))}, and \textit{not} the concrete value 4.
 
 Syntax objects can be converted to and from lists for easier manipulation, using \texttt{syntax->datum} and \texttt{datum->syntax}. This functionality allows us to implement a macro that reverses its arguments:
 
 \begin{lstlisting}
 (define-syntax (reverse-syntax stx)
-  (datum->syntax stx (reverse (cdr (syntax->datum stx)))))
+  (datum->syntax stx
+                   (reverse (cdr (syntax->datum stx)))))
 
-; Expands to (+ 20 22) at compile time, which evaluates to
-; 42 at runtime
+; Expands to (+ 20 22) at compile time, which evaluates
+; to 42 at runtime
 (reverse-syntax 20 22 +)
 \end{lstlisting}
 
 In the macro invocation on line 6, \texttt{stx} will be bound to the entire syntax tree of the macro call, so that \texttt{(syntax->datum stx)} returns \texttt{'(reverse-syntax 20 22 +)} and not \texttt{'(20 22 +)}. Consequently, we must call \texttt{cdr} on this list before reversing it, to remove the name of the macro.
 
-Since syntactic macros are expanded at compile-time, they are capable of things that are impossible for regular functions. \texttt{my-and}, defined below, defines the lazy boolean $and$ function, so that if \texttt{a} in \texttt{(my-and a b)} evaluates to false, then \texttt{b} is never evaluated. Lazy evaluation of this sort could not be implemented by a regular function, because a regular function has no control over the evaluation of its arguments---they are always evaluated before they are passed.
+Since syntactic macros are expanded at compile-time, they are capable of things that are impossible for regular functions. \texttt{my-and}, defined below, defines the short-circuiting boolean $and$ function, so that if \texttt{a} in \texttt{(my-and a b)} evaluates to false, then \texttt{b} is never evaluated. Lazy evaluation of this sort could not be implemented by a regular function, because a regular function has no control over the evaluation of its arguments---they are always evaluated before they are passed.
 
 \begin{lstlisting}
 (define-syntax (my-and stx)
@@ -303,7 +304,7 @@ Since syntactic macros are expanded at compile-time, they are capable of things 
      #'(if a b #f)]))
 \end{lstlisting}
 
-Each identifier in the \texttt{(\_ a b)} pattern clause matches a single top-level expression (which may be an atomic value or a compound structure like a list). The underscore matches the name of the macro itself,\footnote{The use of an underscore is purely conventional, to indicate that the macro does not care about the value it captures. Racket itself treats underscores the same as any other identifier in a syntax pattern.} and the symbols \texttt{a} and \texttt{b} match arguments to the macro.
+\texttt{my-and} uses a pattern-matching function called \texttt{syntax-case}. Each identifier in the \texttt{(\_ a b)} pattern clause matches a single top-level expression (which may be an atomic value or a compound structure like a list). The underscore matches the name of the macro itself,\footnote{The use of an underscore is purely conventional, to indicate that the macro does not care about the value it matches. \texttt{syntax-case} itself treats underscores the same as any other identifier in a syntax pattern.} and the symbols \texttt{a} and \texttt{b} match arguments to the macro.
 
 Macros that use \texttt{syntax-case} can often be abbreviated with \texttt{define-syntax-rule}. Using \texttt{define-syntax-rule}, \texttt{my-and} could be re-written as
 
@@ -343,7 +344,7 @@ If \texttt{swap} were called with a variable \texttt{tmp} as its argument, e.g.
   (set! y tmp))
 \end{lstlisting}
 
-\noindent so that the first \texttt{set!} operation would set the value of the symbol \texttt{tmp} defined in the macro, rather than the \texttt{tmp} defined by the user, and consequently fail to swap the variable's values. In actual fact, the macro system rewrites the identifier \texttt{tmp} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
+\noindent so that the first \texttt{set!} operation would affect the symbol \texttt{tmp} defined in the macro, rather than the \texttt{tmp} defined by the user, and consequently fail to swap the variable's values. In actual fact, the macro system rewrites the identifier \texttt{tmp} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as showshown.
 
 \begin{lstlisting}
 ; Correct -- tmp in the macro is rewritten as tmp:22
@@ -357,7 +358,7 @@ At runtime the expanded macro thus correctly swaps the variable's values, thanks
 
 
 \section{Extending Racket with faceted execution\label{sec:lang}}
-Having seen the interface that \textsc{Racets} exposes to its users, and with the requisite background in syntactic macros, we now turn to implementation of \textsc{Racets}. In this section, I review the current implementation, and present a more flexible and powerful approach using Racket's \texttt{\#lang} mechanism, as well as a concrete proof-of-concept illustrating a crucial technique for using \texttt{\#lang} that resolves an issue with the semantics of mutable state.
+Having seen the interface that \textsc{Racets} exposes to its users, and with the requisite background in syntactic macros, we now turn to the implementation of \textsc{Racets}. In this section, I review the current implementation, and present a more flexible and powerful approach using Racket's \texttt{\#lang} mechanism, as well as a concrete proof-of-concept illustrating a crucial module-rewriting technique that resolves an issue with the semantics of mutable state.
 
 
 \subsection{Racets with macros}
@@ -365,7 +366,7 @@ Having seen the interface that \textsc{Racets} exposes to its users, and with th
 
 \begin{lstlisting}
 (define-syntax (#%app stx)
-  (syntax-parse stx
+  (syntax-case stx ()
     [(_ f a)
       #'(if (facet? a)
           (fac
@@ -375,11 +376,11 @@ Having seen the interface that \textsc{Racets} exposes to its users, and with th
 	  (f a))]))
 \end{lstlisting}
 
-\noindent using the \textsc{Racets}-internal functions \texttt{facet-labelname}, \texttt{facet-left}, and \texttt{facet-right} to access the fields of the facet.
+\noindent using the private functions \texttt{facet-labelname}, \texttt{facet-left}, and \texttt{facet-right} to access the internal fields of the facet.
 
-\texttt{\#\%app}, the name of the macro above, is a special form in Racket. During macro expansion, all function applications are transformed to use the \texttt{\#\%app} form, so that \texttt{(f a b)} is re-written as \texttt{(\#\%app f a b)}. This transformation occurs in plain Racket, independently of \textsc{Racets} and its macro. Defining a macro for \texttt{\#\%app} allows all function applications to be captured and transformed, which is exactly what the semantics of \textsc{Racets} require.
+\texttt{\#\%app}, the name of the macro above, is a special form in Racket. During macro expansion, all function applications are transformed to use the \texttt{\#\%app} form, so that \texttt{(f a b)} is re-written as \texttt{(\#\%app f a b)}. This transformation occurs in plain Racket, independently of \textsc{Racets}. Defining a macro for \texttt{\#\%app} allows all function applications to be captured and transformed, which is exactly what the semantics of \textsc{Racets} require.
 
-Other macros are provided for a subset of the core forms of Racket. See \cite{racets} for details of the implementation.
+Other macros are provided for a subset of the core forms of Racket. See \cite{racets} for details.
 
 
 \subsubsection{Shortcomings\label{sec:shortcomings}}
@@ -399,19 +400,19 @@ To correctly handle \texttt{set!} forms with faceted values, the \textsc{Racets}
 
 Suppose that \texttt{fct} is a facet belonging to Alice whose high-confidentiality value is true and whose low-confidentiality value is false. Upon execution of the \texttt{if} statement, the value of \texttt{x} will be a box containing \texttt{(fac alice-policy 100 50)}. However, \texttt{square-root} expects an integer argument, and not a box, so the call to it on line 7 will fail. Note that the problem is not that \texttt{x} is invisibly transformed into a facet, which happens frequently in policy-agnostic faceted code and is handled by the mechanisms of faceted execution, but that it becomes a box containing a facet.
 
-A simple, brute-force method of handling cases like these is to wrap all bare identifiers in conditional logic that checks if the identifier's value is a box containing a facet, and unboxes it if it is.
+A simple, brute-force method of handling cases like these is to wrap all bare identifiers in conditional logic that checks if the identifier's value is a box containing a facet, and unboxes it if it is.\footnote{Section \ref{sec:ai} will explore a technique for mitigating the resulting performance hit.}
 
-One might imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racet} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
+One could imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racet} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
 
-The second issue is that \textsc{Racets} may interfere with other macros, for instance if the programmer redefined the \texttt{\#\%app} form themselves. As it turns out, the same approach---the language-as-a-library approach---that solves the previous issue addresses this issue as well.
+The second issue is that \textsc{Racets} may interfere with other macros, for instance if a programmer defined a macro for the \texttt{\#\%app} form themselves. As it turns out, the same approach---the languages-as-libraries approach---that solves the previous issue addresses this problem as well.
 
 
 \subsection{Racets as a language-library}
-All Racket files begin with a \texttt{\#lang racket} declaration. The \texttt{\#lang} statement may be used to declare other languages, e.g. \texttt{\#lang typed/racket} for Typed Racket \cite{typed-racket}, and it may be used to delegate parsing of the file to another Racket file. In the latter case, it is written as \texttt{\#lang s-exp "m.rkt"}, where \texttt{m.rkt} is the name of the Racket file to which parsing has been delegated. \texttt{m.rkt} defines syntactic macros which are used in the expansion of the file that includes the \texttt{\#lang s-exp "m.rkt"} declaration.
+All plain Racket files begin with a \texttt{\#lang racket} declaration. The \texttt{\#lang} statement may also be used to declare the use of other languages, e.g. \texttt{\#lang typed/racket} for Typed Racket \cite{typed-racket}, and it may be used to delegate parsing of the file to another Racket file. In the latter case, it is written as \texttt{\#lang s-exp "m.rkt"}, where \texttt{m.rkt} is the name of the Racket file to which parsing has been delegated. \texttt{m.rkt} defines syntactic macros which are used in the expansion of the file that includes the \texttt{\#lang s-exp "m.rkt"} declaration.
 
-The languages-as-libraries approach \cite{lang-as-lib} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code, and which can reuse the functionality exposed by the Racket compiler, greatly simplifying their implementation. The key idea of languages-as-libraries is to re-define the \texttt{\#\%module-begin} form, which implicitly or explicitly wraps all Racket modules, so that the entire source code of the module can be intercepted. The source code can then be passed to a Racket function called \texttt{local-expand}, which invokes the macro expansion process to expand the source code into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}, expanding all user-defined macros along the way.
+The languages-as-libraries approach \cite{lang-as-lib} uses \texttt{\#lang} to implement new domain-specific languages which are compatible with plain Racket code, and which can reuse the functionality exposed by the Racket compiler, greatly simplifying their implementation. The key idea of languages-as-libraries is to redefine the \texttt{\#\%module-begin} form, which implicitly or explicitly wraps all Racket modules, so that the entire source code of the module can be intercepted before it is evaluated. The source code can then be passed to a Racket function called \texttt{local-expand}, which invokes the macro expansion process to expand the source code into a minimal subset of Racket called Fully-Expanded Racket \cite{fe-racket}, expanding all user-defined macros along the way.
 
-The language-library then only needs to provide translations for the small set of core forms that constitute Fully-Expanded Racket, rather than the much larger set of forms that may appear in regular Racket. Furthermore, it does not need to worry about name conflicts with user-defined macros, since they have already been expanded by \texttt{local-expand}.
+The language-library then only needs to provide translations for the small set of core forms that constitute Fully-Expanded Racket, rather than the much larger set of forms that may appear in regular Racket. Furthermore, it does not need to worry about conflicts with user-defined macros, since they have already been expanded by \texttt{local-expand}.
 
 
 \subsubsection{Small example of a language-library}
@@ -425,6 +426,8 @@ The following minimal but complete example of the languages-as-libraries idea pr
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     [(_ forms ...)
+    ; Bind core-forms to the result of macro-expanding
+    ; forms.
     (with-syntax ([(_ core-forms ...)
                    (local-expand
                      #'(#%plain-module-begin forms ...)
@@ -437,11 +440,12 @@ The following minimal but complete example of the languages-as-libraries idea pr
 ; Export everything from the regular Racket language,
 ; except replace #%module-begin with our own
 ; implementation.
-(provide (except-out (all-from-out racket) #%module-begin)
+(provide (except-out (all-from-out racket)
+                       #%module-begin)
           (rename-out [module-begin #%module-begin]))
 \end{lstlisting}
 
-If this program were saved in a file called \texttt{print-ast.rkt}, then other files could be written in the language by beginning with \texttt{\#lang s-exp "print-ast.rkt"}.
+If this program were saved in a file called \texttt{print-ast.rkt}, then other files could be written in the language by declaring \texttt{\#lang s-exp "print-ast.rkt"} at the top of the file.
 
 The file \texttt{print-ast.rkt} begins with the standard \texttt{\#lang racket} declaration, since it itself is written in Racket. It then defines a macro called \texttt{module-begin} which rewrites its argument to be
 
@@ -451,7 +455,7 @@ The file \texttt{print-ast.rkt} begins with the standard \texttt{\#lang racket} 
     core-forms ...))]))
 \end{lstlisting}
 
-\noindent where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object. The macro then outputs a \texttt{\#\%plain-module-begin} form (rather than a \texttt{\#\%module-begin}, to avoid infinite recursion during macro expansion) that wraps the original source syntax, after a call to \texttt{displayln} that prints at runtime the actual syntax object that was generated at compile-time.
+\noindent where \texttt{core-forms} is defined by the \texttt{with-syntax} clause to be the result of invoking \texttt{local-expand} on the original syntax object. The macro then outputs a \texttt{\#\%plain-module-begin} form (rather than a \texttt{\#\%module-begin} form, to avoid infinite recursion during macro expansion) that wraps the original source syntax, after a call to \texttt{displayln} that prints at runtime the actual syntax object that was generated at compile-time.
 
 
 \subsubsection{Proof-of-concept of Racets as a language-library}
@@ -516,8 +520,9 @@ The core of \texttt{wrap-ident.rkt} is a procedure called \texttt{transform-synt
 
     ; Any other list of forms.
     ([a b ...]
-     (datum->syntax stx (cons #'a (map transform-syntax
-                                           (syntax-e #'(b ...))))))
+     (datum->syntax stx (cons #'a
+                                (map transform-syntax
+                                     (syntax-e #'(b ...))))))
 
     ; Any other individual form.
     (default
@@ -528,7 +533,7 @@ The core of \texttt{wrap-ident.rkt} is a procedure called \texttt{transform-synt
 
 The code listing above is not exhaustive: special cases for \texttt{let-values} and \texttt{letrec-values}, among others, are omitted for the sake of brevity as their syntax requires complex pattern matching.
 
-Each pattern has a guard clause that uses the helper function \texttt{check-ident} to check that the head of the matched form is bound to the same variable as the form to be re-written. \texttt{check-ident} is defined below. It uses \texttt{free-identifier=?} to check its argument's binding. It is important to use this function rather than comparing the textual content of the identifiers, because Racket does not guarantee the textual content will be the same. An identifier may have the surface form of \texttt{lambda} but actually be bound to \texttt{\#\%plain-lambda}. \texttt{free-identifier=?}, unlike a comparison of symbolic equality, is sensitive to this distinction.
+Each pattern has a guard clause that uses the helper function \texttt{check-ident} to check that the head of the matched form is bound to the same variable as the form to be re-written. \texttt{check-ident} is defined below. It uses \texttt{free-identifier=?} to check its argument's binding. It is important to use this function rather than comparing the textual content of the identifiers, because Racket does not guarantee the textual content will be the same. For instance, an identifier may have the surface form of \texttt{lambda} but actually be bound to \texttt{\#\%plain-lambda}. \texttt{free-identifier=?}, unlike a comparison of symbolic equality, is sensitive to this distinction.
 
 \begin{lstlisting}
 (define (check-ident ident expected)
@@ -551,7 +556,8 @@ The final piece is the whole-module rewrite rule:
 			  '())])
        (transform-syntax expanded))]))
 
-(provide (except-out (all-from-out racket) #%module-begin)
+(provide (except-out (all-from-out racket)
+                       #%module-begin)
           (rename-out [module-begin #%module-begin]))
 \end{lstlisting}
 
@@ -566,7 +572,7 @@ Since \textsc{Racets}, like Racket, is dynamically typed, errors in the use of f
 
 A type system is ``a tractable syntactic method for proving the absence of certain program behaviors by classifying phrases according to the kinds of values they compute'' \cite{types}. The program behaviors that a type system are meant to prevent are generally what are called type errors: attempted operations on values for which the operation is not defined.
 
-Naturally, type systems cannot catch all errors: some undesirable program behaviors cannot be detected (e.g., looping infinitely is not detectable due to the uncomputability of the halting problem), and type systems will sometimes reject constructs which are actually safe. Nonetheless, a well-designed type system is an effective tool for catching programmer errors.
+Naturally, type systems cannot catch all errors: some undesirable program behaviors cannot be detected in the general case (e.g., looping infinitely is not detectable due to the uncomputability of the halting problem), and type systems will sometimes reject constructs which are actually safe. Nonetheless, a well-designed type system is an effective tool for catching programmer errors.
 
 Formal type theory will be presented through the example of the typed lambda calculus. The following exposition is based on chapter 9 of \cite{types}.
 
@@ -599,7 +605,7 @@ The rule for lambda abstraction is a bit more complicated:
 {\Gamma \vdash \lambda x : T_1 . t_2 : T_1 \to T_2}
 \]
 
-In the hypothesis, the expression $\Gamma, x : T_1$ should be read as ``$\Gamma$ augmented with the assignment of type $T_1$ to $x$.'' It is assumed that the variable $x$ is not already in $\Gamma$; if it is, it can be renamed. The full hypothesis of the abstraction rule states that the body of the lambda function has type $T_2$ with the given assignment function. The conclusion of the abstraction rule states that the lambda function as a whole has the complex type $T_1 \to T_2$, a function from values of type $T_1$ to values of type $T_2$.
+In the hypothesis, the expression $\Gamma, x : T_1$ should be read as ``$\Gamma$ augmented with the assignment of type $T_1$ to $x$.'' It is assumed that the variable $x$ is not already in $\Gamma$; if it is, it can be renamed. The full hypothesis of the abstraction rule states that the body of the lambda function has type $T_2$ with the given assignment function. The conclusion of the abstraction rule states that the lambda function as a whole has the complex type $T_1 \to T_2$, the type of a function from values of type $T_1$ to values of type $T_2$.
 
 Finally, the last syntactic form of the language, application, has the type rule
 
@@ -608,7 +614,7 @@ Finally, the last syntactic form of the language, application, has the type rule
 {\Gamma \vdash t_1\ t_2 : T_{12}}
 \]
 
-Given that the function has type $T_{11} \to T_{12}$ in $\Gamma$, and the argument has type $T_{11}$, then the expression as a whole has type $T_{12}$.
+Given that the function has type $T_{11} \to T_{12}$ in $\Gamma$, and the argument has type $T_{11}$, then the application as a whole has type $T_{12}$.
 
 The three type rules presented above can be applied to any expression in the typed lambda calculus to detect whether it is well-typed, and if it is, to determine its concrete type. Thus the type system is able to statically detect type errors in the lambda calculus.
 
@@ -617,23 +623,23 @@ Type systems for real programming languages are significantly more complex, but 
 
 
 \section{Faceted execution and abstract interpretation\label{sec:ai}}
-Another practical problem with faceted execution is that faceted code can run significantly more more slowly than non-faceted code. Functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value, resulting in a performance hit for faceted code.\footnote{It also complicates the use of functions with side-effects, which is an open problem in \textsc{Racets}.} This performance hit can be mitigated by static analysis. A static analyzer might, for instance, be able to prove that a facet is only ever resolved to its high-confidentiality value, in which case that value could be substituted for the facet as a whole, skipping double evaluation wherever it is passed to a function.
+Another practical problem with faceted execution is that faceted code can run significantly more more slowly than non-faceted code. Functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value, resulting in a performance hit for faceted code.\footnote{It also complicates the use of functions with side-effects, which is an open problem in \textsc{Racets}.} This performance hit can be mitigated by static analysis. A static analyzer might, for instance, be able to prove that a facet is only ever resolved to its high-confidentiality value, in which case the high-confidentiality value could be substituted for the facet as a whole, skipping double evaluation wherever it is passed to a function.
 
-One technique for static analysis is abstract interpretation \cite{abstract-inter}, wherein the computation of a program is modeled with abstract categories instead of concrete values (e.g., ``negative number'' instead of -10) so that semantic properties of the program can be deduced by a decidable procedure \cite{ai-original}.
+One technique for static analysis is abstract interpretation \cite{abstract-inter}, wherein the computation of a program is modeled with abstract categories instead of concrete values (e.g., ``negative number'' instead of $-10$) so that semantic properties of the program can be deduced by a decidable procedure \cite{ai-original}.
 
 
 \subsection{Deriving abstract interpreters from abstract machines}
-Abstract interpreters can be derived from abstract machines using the technique ``abstracting abstract machines'' technique presented in \cite{aam}. An \textit{abstract machine} is a formal mathematical object that models a computing machine. Abstract machines consist of a set of elements that comprise its state, and transition rules that determine how the machine moves from state to state.
+Abstract interpreters can be derived from abstract machines using the ``abstracting abstract machines'' technique presented in \cite{aam}. An \textit{abstract machine} is a formal mathematical object that models a computing machine. Abstract machines consist of a set of elements that comprise its state, and transition rules that determine how the machine moves from state to state.
 
-Three abstract machines of increasing resemblance to real-world technology will be presented here: the CEK, CESK, and CESK* machines. Though the language that these machines evaluate (the untyped lambda calculus) is superficially very different from real programming languages, in principle the mechanisms of function definition, application, and lexical closure are the core of most actual languages, and at any rate the lambda calculus is much closer to a realistic programming language than, e.g., the finite transition systems that underlie the computation of a Turing machine are.
+Three abstract machines of increasing resemblance to real-world technology will be presented here: the CEK, CESK, and CESK* machines. Though the language that these machines evaluate (the untyped lambda calculus) is superficially very different from real programming languages, in principle the mechanisms of function definition, application, and lexical closure are the core of many actual languages, and at any rate the lambda calculus is much closer to a realistic programming language than, e.g., the finite transition systems that underlie the computation of a Turing machine are.
 
-The CEK machine has three elements in its state: $c$, an expression in the lambda calculus; $\rho$, an environment that maps from symbols to values; and $\kappa$, a continuation (the acronym ``CEK'' stands for the elements of the state). All values in the lambda calculus are closures, which are represented by pairs of lambda functions and environments.
+The CEK machine has three elements in its state: $c$, an expression in the lambda calculus; $\rho$, an environment that maps from symbols to values; and $\kappa$, a continuation (the letters of the acronym ``CEK'' stand for the elements of the state). All values in the lambda calculus are closures, which are represented by pairs of lambda functions and environments.
 
 A continuation is a mathematical structure for representing control flow. Intuitively, a continuation encapsulates what the machine should do next after evaluating the current expression. For the lambda calculus, the sequence of machine operations is very simple, as only function application (of the three syntactic terms) requires any control flow at all: the function is evaluated first, followed by the argument, and then the body of the function. At each step, the continuation stores what the next step is.
 
 In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \kappa)$ for evaluating an argument, $\textbf{fn}((\lambda x.e), \rho, \kappa)$ for evaluating the body of a function, and $\textbf{mt}$ (``empty'') for halting computation. In the first two forms, $\rho$ is the environment in which the expression is to be evaluated, and $\kappa$ is the continuation that is to be followed afterwards.
 
-The entirety of the operation of the CEK machine is described by four transition rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
+The entirety of the operation of the CEK machine is described by four transition rules that map from one machine state to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
 
 % Evaluating a symbol (CEK)
 $$
@@ -688,7 +694,7 @@ $$ inj_{CEK}(e) = \langle e, \emptyset, \textbf{mt} \rangle $$
 
 The environment is initially empty, and the continuation is \textbf{mt}, because the next thing to do after evaluating the expression is to halt.
 
-The transition rules may be clarified by walking through their application in a concrete example. Suppose we want to evaluate the lambda expression $(\lambda x.x\ \lambda y.y)$ (which should evaluate to $\lambda y.y$). We begin by applying $inj_{CEK}$ to get the initial state of the machine:
+The transition rules may be clarified by walking through their application in a concrete example. Suppose we want to evaluate the lambda expression $(\lambda x.x\ \lambda y.y)$ (which should evaluate to $\lambda y.y$). We begin by calling $inj_{CEK}$ to get the initial state of the machine:
 
 $$ s_0 = \langle (\lambda x.x\ \lambda y.y), \emptyset, \textbf{mt} \rangle $$
 
@@ -700,7 +706,7 @@ $s_1$ in turn matches rule 3, which we apply below. We are now evaluating the ar
 
 $$ s_2 = \langle \lambda y.y, \emptyset, \textbf{fn}(\lambda x.x, \emptyset, \textbf{mt}) \rangle $$
 
-$s_2$ matches rule 4. We bind the value of the argument to the function's parameter in the environment, and evaluate the body in this new environment. Since evaluating the body is the last step in evaluating the function application as a whole, the continuation points to the next thing (halt computation) as expected.
+$s_2$ matches rule 4. We bind the value of the argument to the function's parameter in the environment, and evaluate the body in this new environment. Since evaluating the body is the last step in evaluating the function application as a whole, the continuation points to halting computation as expected.
 
 $$ s_3 = \langle x, \{ x: (\lambda y.y, \emptyset) \}, \textbf{mt} \rangle $$
 
@@ -708,9 +714,9 @@ $s_3$ matches rule 1:
 
 $$ s_4 = \langle \lambda y.y, \emptyset, \textbf{mt} \rangle $$
 
-We have now reached a value with a continuation of \textbf{mt}, so computation halts. As expected, the value $\lambda y.y$ is in the expression slot of the final slot.
+We have now reached a state whose expression is a value and whose continuation is \textbf{mt}, so computation halts. As expected, the value $\lambda y.y$ is in the expression slot of the final slot.
 
-The CEK machine can be augmented with a store to represent mutable state. A store maps addresses to values, and can be imagined as the abstract mathematical equivalent of a computer's memory unit.
+The CEK machine can be augmented with a store to represent mutable state. A store maps addresses to values, and can be imagined as the abstract equivalent of a computer's memory unit.
 
 The CEK machine augmented with a store is known as the CESK machine \cite{cesk}. \cite{aam} present a slight modification to the CESK machine, in which continuations are allocated in the store in order to make the machine more amenable to conversion into an abstract interpreter. This machine is known as the CESK* machine.
 
@@ -722,7 +728,7 @@ $$ inj_{CESK*}(e) = \langle e, \emptyset, \{ a_0: \textbf{mt} \}, a_0 \rangle $$
 
 The environment is initially empty. The store contains the \textbf{mt} continuation, and the continuation address slot points at this continuation.
 
-The four rules for the behavior of the CESK* machine are likewise similar.\footnote{These rules are reproduced and slightly modified from Figure 3 on p. 4 of \cite{aam}.} Several of the rules use $alloc()$, a function which returns a new address in the store that has not been used yet.
+The four rules for the behavior of the CESK* machine are likewise similar.\footnote{These rules are reproduced and slightly modified from Figure 3 on p. 4 of \cite{aam}.} Several of the rules use $alloc(\sigma)$, a function which returns a new address in the store that has not been used yet.
 
 The first rule, for evaluating variables, is almost identical:
 
@@ -732,7 +738,7 @@ $$
 \langle x, \rho, \sigma, a \rangle
 \to
 \langle v, \rho', \sigma, a \rangle,
-\text{ given that $x$ is bound to $(v, \rho')$ in $\rho$}
+\text{ given that } (v, \rho') = \sigma(\rho(x))
 $$
 
 The second rule, for function application, differs only in that the continuation is allocated in the store:
@@ -743,7 +749,7 @@ $$
 \langle (e_0\ e_1), \rho, \sigma, a \rangle
 \to
 \langle e_0, \rho, \sigma[b \mapsto \textbf{ar}(e_1, \rho, a)], b \rangle
-\text{ where $b = alloc()$}
+\text{ where $b = alloc(\sigma)$}
 $$
 
 The third and fourth rules again differ only in the use of the store:
@@ -754,7 +760,7 @@ $$
 \langle v, \rho, \sigma, a \rangle
 \to
 \langle e, \rho', \sigma[b \mapsto \textbf{fn}(v, \rho, c)], b \rangle
-\text{ where $b = alloc()$}
+\text{ where $b = alloc(\sigma)$}
 $$
 $$
 \text{given that $a$ maps to $\textbf{ar}(e, \rho', c)$ in $\sigma$}
@@ -771,11 +777,11 @@ $$
 \text{given that $a$ maps to $\textbf{fn}((\lambda x.e), \rho', c)$ in $\sigma$}
 $$
 
-The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allow the construction of an abstract interpretation from the CESK* machine to proceed more smoothly.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
+The CESK* machine is thus quite similar in principle to the CEK machine, but the use of a store for values and continuations allows the construction of an abstract interpretation from the CESK* machine to proceed more smoothly.\footnote{In \cite{aam}, the authors tweak the CESK* machine to use time-stamps before they derive the abstract interpreter. For simplicity of exposition, this modification has been omitted.} The reason is that abstract interpretation must terminate to be useful in practice. The abstract interpreter can enforce that the store is finite, so moving values and continuations to the store ensures that the interpretation will terminate, which otherwise could not be guaranteed if environments and continuations were arbitrary recursive structures unbound to any finite container.
 
-The abstract CESK* interpreter is defined similarly to the CESK* machine, except that the store maps to sets of values instead of concrete values, and it transitions between sets of machine states instead of single states. The interpreter continues transitioning until it reaches a fixed-point, when applying its transition function to each individual states yields the original set. Once the abstract CESK* interpreter has terminated, its store can be inspected to determine semantic properties of the program.
+The abstract CESK* interpreter is defined similarly to the CESK* machine, except that the store maps to sets of values instead of concrete values, and the machine transitions between sets of states instead of individual states. The interpreter continues transitioning until it reaches a fixed-point, when applying its transition function to each individual states yields the same set of states as before. Once the abstract CESK* interpreter has terminated, its store can be inspected to determine semantic properties of the program.
 
-Formally, the abstract CESK* interpreter is a 4-tuple $(c, \rho, \hat{\sigma}, a)$, where $c$, $\rho$ and $a$ are defined the same as for the CESK* machine, and $\hat{\sigma}$ maps from addresses to sets of values instead of single values.
+Formally, the abstract CESK* interpreter is a 4-tuple $(c, \rho, \hat{\sigma}, a)$, where $c$, $\rho$ and $a$ are defined the same as for the CESK* machine, and $\hat{\sigma}$ maps from addresses to sets of values.
 
 The behavior of the abstract CESK* interpreter is defined by four transition rules. Some of these rules make use of an allocation function $\widehat{alloc} : \hat{\Sigma} \times Kont \to Addr$, which takes in an abstract interpreter state and a continuation in order to decide what address to return. Its implementation is left unspecified here.
 
@@ -787,10 +793,10 @@ $$
 \langle x, \rho, \hat{\sigma}, a \rangle
 \to
 \langle v, \rho', \hat{\sigma}, a \rangle,
-\text{ given that $(v, \rho') \in \rho(x)$}
+\text{ given that $(v, \rho') = \sigma(\rho(x))$}
 $$
 
-The remaining three rules are where the important difference between the CESK* machine and the abstract CESK* interpreter come to light. Rather than assigning directly to the store, the new mapping is unioned with the existing store, so that it contains both the new mapping and any old mapping that the new mapping might have otherwise overwritten.
+The remaining three rules are where the important difference between the CESK* machine and the abstract CESK* interpreter comes to light. Rather than assigning directly to the store, the new mapping is unioned with the existing store, so that the store in the output state contains both the new mapping and any old mapping that the new mapping might have otherwise overwritten.
 
 % Evaluating an application (abstract CESK*)
 $$
@@ -826,12 +832,13 @@ Other than modifying the store in the manner described above, the transition rul
 
 When the abstract interpreter has terminated, its store can be inspected to reason about the semantics of the program. For example, if every element of the set that address $a$ maps to is a negative number, then we can conclude that the variable or variables corresponding to $a$ will always be negative.
 
-% TODO: Awkward
-We are now in a position to understand why store-allocated continuations are crucial for converting the CESK* machine into an abstract interpreter. Abstract interpretation must terminate to be useful in practice. One way of enforcing termination is by keeping the store finite, which can be accomplished by defining the allocation function $\widehat{alloc}$ in such a way that its co-domain is finite. If continuations were outside of the store, they would be recursive structures that could potentially nest infinitely. Once moved to the store, their finite-ness is guaranteed by the broader finite-ness of the store itself.
+We are now in a position to understand why store-allocated continuations are crucial for converting the CESK* machine into an abstract interpreter. Abstract interpretation must terminate to be useful in practice. One way of enforcing termination is by keeping the store finite, which can be accomplished by defining the allocation function $\widehat{alloc}$ in such a way that its co-domain is finite. If continuations were outside of the store, they would be recursive structures that could potentially nest infinitely. Once moved to the store, their finite cardinality is guaranteed by the broader finite cardinality of the store itself.
+
+In summary, computation of the lambda calculus can be described mathematically with the CEK, CESK, and CESK* machines. The CESK* machine can be converted into an abstract interpreter which deduces semantic properties of programs in the lambda calculus, while guaranteeing termination.
 
 
 \subsection{Abstract interpretation of Racets}
-Recall that the original motivation for abstract interpretation was to improve the runtime performance of programs by statically proving facts about the program's semantics that could be used for compile-time optimizations. The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every variable reference must be wrapped in a conditional. A simple module like
+Recall that the original motivation for abstract interpretation was to improve the runtime performance of programs by statically proving facts about the program's semantics that could be used for compile-time optimizations. The extended \textsc{Racets} implementation presented in section \ref{sec:lang} has a particularly high runtime overhead, because every variable reference is wrapped in a conditional. A simple module like
 
 \begin{lstlisting}
 #lang s-exp "racets.rkt"
@@ -841,7 +848,7 @@ Recall that the original motivation for abstract interpretation was to improve t
 (displayln (+ x y))
 \end{lstlisting}
 
-\noindent would balloon into
+\noindent balloons into
 
 \begin{lstlisting}
 #lang s-exp "racets.rkt"
@@ -871,20 +878,20 @@ Recall that the original motivation for abstract interpretation was to improve t
       y)))
 \end{lstlisting}
 
-Of course, none of these conditionals are actually necessary, because neither \texttt{displayln}, nor \texttt{+}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets in this code at runtime.
+Of course, none of these conditionals are actually necessary, because neither \texttt{displayln}, nor \texttt{+}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime in this code.
 
-An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract interpreter were able to determine that a particular value was never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be eliminated at compile time.
+An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract interpreter were able to determine that a particular value was never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be statically eliminated.
 
-The level of precision that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. In general, the more fine-grained the conclusions the abstract interpreter can draw, the greater the improvement of performance time, at the cost of slower analysis and a more complex abstract interpreter.
+The level of precision that the abstract interpreter attains with its analysis can have a substantial effect on performance. For example, if a certain function is sometimes applied to faceted values and sometimes applied to regular values, the abstract interpreter may or may not be able to identify the call sites that require special handling of the faceted execution, and those that can be run normally. The abstract interpreter's precision is directly related to the implementation of the $\widehat{alloc}$ function: the more distinct addresses that $\widehat{alloc}$ allows, the greater the precision of the analysis, at the cost of slower performance for the abstract interpretation.
 
 Actually deriving an abstract interpreter for \textsc{Racets} (bridging the high-level description in this section with the low-level details in the previous section) is beyond the scope of this undergraduate thesis. See \cite{abstract-inter} for current work in this area.
 
 
 
 \section{Conclusion\label{sec:conclusion}}
-The primary novel contribution of this thesis is the application of the language-as-a-library technique to \textsc{Racets} in order to correctly handle mutable state and improve interoperability with non-faceted code. Two other issues in the ergonomics of faceted execution have been discussed at some length: type safety, and runtime efficiency. I have shown that static typing and abstract interpretation could mitigate these issues.
+The primary novel contribution of this thesis is the application of the languages-as-libraries technique to \textsc{Racets} in order to correctly handle certain constructions involving facets and mutable state. Two other issues in the ergonomics of faceted execution have been discussed at some length: type errors and poor performance. I have shown that static typing and abstract interpretation could mitigate these issues.
 
-Further research may proceed in a number of directions. The presentation of static typing and abstract interpretation here has been extremely preliminary, and the details of their concrete implementation in \textsc{Racets} or in other faceted-execution systems remains to be fleshed out. The proof-of-concept of re-writing \textsc{Racets} as a \texttt{\#lang}-style language will need to be extended with the existing \textsc{Racets} macros that implement the primitives of faceted execution.
+Further research may proceed in a number of directions. The presentation of static typing and abstract interpretation here has been extremely preliminary, and the details of their concrete implementation in \textsc{Racets} or in other faceted-execution systems remain to be fleshed out. The proof-of-concept of \textsc{Racets} as a language-library will need to be extended with the existing \textsc{Racets} macros that implement the primitives of faceted execution.
 
 The theory and techniques reviewed in this thesis should contribute to the ergonomics of writing code with faceted execution, and thus in turn to safeguarding the privacy of software users.
 
