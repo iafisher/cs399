@@ -60,7 +60,7 @@ The rest of section \ref{sec:intro} reviews the mechanics of faceted execution i
 
 
 \subsubsection{Core forms of faceted execution}
-Privacy policies are represented in \textsc{Racets} as predicates which take an argument and return a boolean value indicating whether the argument satifies the policy or not. They are declared with the \texttt{let-label} form:
+Privacy policies are represented in \textsc{Racets} as predicates which take an argument and return a boolean value indicating whether the argument satisfies the policy or not. They are declared with the \texttt{let-label} form:
 
 \begin{lstlisting}
 (define alice-policy
@@ -344,7 +344,7 @@ If \texttt{swap} were called with a variable \texttt{tmp} as its argument, e.g.
   (set! y tmp))
 \end{lstlisting}
 
-\noindent so that the first \texttt{set!} operation would affect the symbol \texttt{tmp} defined in the macro, rather than the \texttt{tmp} defined by the user, and consequently fail to swap the variable's values. In actual fact, the macro system rewrites the identifier \texttt{tmp} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as showshown.
+\noindent so that the first \texttt{set!} operation would affect the symbol \texttt{tmp} defined in the macro, rather than the \texttt{tmp} defined by the user, and consequently fail to swap the variable's values. In actual fact, the macro system rewrites the identifier \texttt{tmp} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as shown below.
 
 \begin{lstlisting}
 ; Correct -- tmp in the macro is rewritten as tmp:22
@@ -402,7 +402,7 @@ Suppose that \texttt{fct} is a facet belonging to Alice whose high-confidentiali
 
 A simple, brute-force method of handling cases like these is to wrap all bare identifiers in conditional logic that checks if the identifier's value is a box containing a facet, and unboxes it if it is.\footnote{Section \ref{sec:ai} will explore a technique for mitigating the resulting performance hit.}
 
-One could imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racet} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
+One could imagine that there is a \texttt{\#\%identifier} form in Racket which wraps all identifiers at some point in the macro expansion process, analogous to the \texttt{\#\%app} form for function applications. In that case, \textsc{Racets} could include a macro for \texttt{\#\%identifier} that implements the necessary logic. Unfortunately, there is no such form: identifiers are ``raw'' in the syntax and cannot be targeted individually and exclusively by a syntactic macro. A different approach must be used.
 
 The second issue is that \textsc{Racets} may interfere with other macros, for instance if a programmer defined a macro for the \texttt{\#\%app} form themselves. As it turns out, the same approach---the languages-as-libraries approach---that solves the previous issue addresses this problem as well.
 
