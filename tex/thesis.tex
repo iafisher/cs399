@@ -265,44 +265,39 @@ This section and the previous one have illustrated usability issues with the int
 \subsection{Syntactic macros}
 Since syntactic macros figure heavily in the implementation of \textsc{Racets}, a brief introduction to the Racket macro system is given here. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive treatment.
 
-Syntactic macros are a mechanism by which the source syntax of a program is transformed prior to execution, so that programmers may define new syntactic structures without having to modify the actual compiler or interpreter. They are a more powerful cousin of the lexical macros familiar to C and C++ programmers.
+A syntactic macro is a procedure that transforms the syntax of a program prior to execution. Syntactic macros allow programmers to define new syntactic structures without having to modify the language's parser.
 
-The definition of a macro resembles a function that receives a syntax object as input and returns another syntax object as output, except that \texttt{define-syntax} is used instead of \texttt{define}. The simplest possible macro returns its input unchanged:
+At compile time, the Racket compiler searches through the source code for uses of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more more macros are left. This process is known as \textit{macro expansion}.
+
+The definition of a macro resembles a function that receives a syntax object as input and returns another syntax object as output, except that \texttt{define-syntax} is used instead of \texttt{define}. The following macro uses the \texttt{syntax} constructor for syntax objects to return a new syntactic form, ignoring its input:
 
 \begin{lstlisting}
-(define-syntax (identity stx) stx)
+(define-syntax (say-hello stx)
+  (syntax (displayln "hello")))
 \end{lstlisting}
 
 A macro is invoked just like a regular function:
 
 \begin{lstlisting}
-; Expands to x
-(identity x)
+; Expands to (displayln "hello") -- the input to the
+; macro is ignored.
+(say-hello (+ 2 2))
 \end{lstlisting}
 
-At compile time, the Racket compiler searches through the source code for uses of user-defined macros, evaluates the macros where they appear, and substitutes the result into the original source code. It then continues to recursively search the syntax tree, expanding macros until no more more macros are left in the source code. This process is known as \textit{macro expansion}.
+Unlike a regular function, a macro's argument is a syntax tree rather than a concrete value. In the call to \texttt{say-hello} above, the \texttt{stx} parameter would be bound to the entire syntax object for \texttt{(say-hello (+ 2 2))}, and \textit{not} the concrete value 4.
 
-New syntax objects can be constructed with the \texttt{syntax} function or its abbreviation, \texttt{\#'}:
-
-\begin{lstlisting}
-(define-syntax (ignore-input stx)
-  ; Equivalent to (syntax (displayln "ignoring input"))
-  #'(displayln "ignoring input")
-\end{lstlisting}
-
-Syntax objects can be converted to and from lists. This functionality allows us to implement a macro that reverses its arguments:
+Syntax objects can be converted to and from lists for easier manipulation, using \texttt{syntax->datum} and \texttt{datum->syntax}. This functionality allows us to implement a macro that reverses its arguments:
 
 \begin{lstlisting}
 (define-syntax (reverse-syntax stx)
   (datum->syntax stx (reverse (cdr (syntax->datum stx)))))
-\end{lstlisting}
 
-It is necessary to pass the \texttt{cdr} of the syntax list to \texttt{reverse} (a regular Racket function that operates on lists), because the \texttt{car} of the syntax list will always be the token \texttt{reverse-syntax} itself. A programmer could use the \texttt{reverse-syntax} macro as follows:
-
-\begin{lstlisting}
-; Expands to (+ 20 22), which evaluates to 42
+; Expands to (+ 20 22) at compile time, which evaluates to
+; 42 at runtime
 (reverse-syntax 20 22 +)
 \end{lstlisting}
+
+In the macro invocation on line 6, \texttt{stx} will be bound to the entire syntax tree of the macro call, so that \texttt{(syntax->datum stx)} returns \texttt{'(reverse-syntax 20 22 +)} and not \texttt{'(20 22 +)}. Consequently, we must call \texttt{cdr} on this list before reversing it, to remove the name of the macro.
 
 Since syntactic macros are expanded at compile-time, they are capable of things that are impossible for regular functions. \texttt{my-and}, defined below, defines the lazy boolean $and$ function, so that if \texttt{a} in \texttt{(my-and a b)} evaluates to false, then \texttt{b} is never evaluated. Lazy evaluation of this sort could not be implemented by a regular function, because a regular function has no control over the evaluation of its arguments---they are always evaluated before they are passed.
 
@@ -324,39 +319,45 @@ Macros that use \texttt{syntax-case} can often be abbreviated with \texttt{defin
 
 Macros defined with \texttt{define-syntax-rule} can have multiple parameters, which bind to the syntactic arguments to the macro. The body of the macro is implicitly converted from an S-expression into a syntax object.
 
-One final point about syntactic macros in Racket is that they are hygienic, meaning that identifiers introduced in the macro are protected from conflicting with identical symbols in the original source code. Consider the following macro, which increments its argument by ten:
+One final point about syntactic macros in Racket is that they are hygienic, meaning that identifiers introduced in the macro are protected from conflicting with identical symbols in the original source code. Consider the following macro, which takes two variables and swaps their values:
 
 \begin{lstlisting}
-(define-syntax (add-ten stx)
-  (syntax-case stx ()
-    [(_ a)
-     #'(let ([x 10]) (+ x a))]))
+(define-syntax-rule (swap a b)
+  (let ([tmp a])
+    (set! a b)
+    (set! b tmp)))
 \end{lstlisting}
 
-If \texttt{add-ten} were called with a variable \texttt{x} as its argument, e.g.
+If \texttt{swap} were called with a variable \texttt{tmp} as its argument, e.g.
 
 \begin{lstlisting}
-(define x 32)
-(add-ten x)
+(define tmp 42)
+(define y 0)
+(swap 42 0)
 \end{lstlisting}
 
-\noindent then one might expect that it would expand to
+\noindent then one might expect that, by simple textual substitution, it would expand to
 
 \begin{lstlisting}
+(define tmp 42)
+(define y 0)
+
 ; Wrong!
-(define x 32)
-(let ([x 10] (+ x x)))
+(let ([tmp tmp])
+  (set! tmp y)
+  (set! y tmp))
 \end{lstlisting}
 
-\noindent so that \texttt{(add-ten x)} would counterintuitively evaluate to 20, despite \texttt{x} being equal to 32 as far as the programmer was concerned. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
+\noindent so that the first \texttt{set!} operation would set the value of the symbol \texttt{tmp} defined in the macro, rather than the \texttt{tmp} defined by the user, and consequently fail to swap the variable's values. In actual fact, the macro system rewrites the identifier \texttt{tmp} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
 
 \begin{lstlisting}
-; Correct -- x in the macro is rewritten as x:3
-(define x 32)
-(let ([x:3]) (+ x x:3))
+; Correct -- tmp in the macro is rewritten as tmp:22
+(let ([tmp:22 tmp])
+  (set! tmp y)
+  (set! y tmp:22))
 \end{lstlisting}
 
-At runtime the expanded macro thus correctly evaluates to 42.
+At runtime the expanded macro thus correctly swaps the variable's values, thanks to the guaranteed hygiene of Racket macros.
 
 
 \subsection{Racets with macros}
