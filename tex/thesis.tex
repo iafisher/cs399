@@ -257,11 +257,6 @@ Programmers may find it useful to convert a faceted list into a list of non-face
 This section and the previous one have illustrated usability issues with the interaction of faceted execution and data structures, stemming from the generic treatment of faceted function application. For the sake of programming ergonomics, future implementations of faceted execution may wish to not treat functional application quite so generically, so as to allow structure-creating forms like \texttt{list} and struct constructors to behave more intuitively with faceted arguments.
 
 
-
-\section{Extending Racket with faceted execution\label{sec:lang}}
-\textsc{Racets} is currently implemented as a collection of syntactic macros. In this section, I review the current implementation, and present a more flexible and powerful approach using Racket's \texttt{\#lang} mechanism, as well as a concrete proof-of-concept illustrating a crucial technique for using \texttt{\#lang} that resolves an issue with the semantics of mutable state.
-
-
 \subsection{Syntactic macros}
 Since syntactic macros figure heavily in the implementation of \textsc{Racets}, a brief introduction to the Racket macro system is given here. Readers are referred to the ``Fear of Macros'' tutorial \cite{fear-of-macros} for a much more comprehensive treatment.
 
@@ -358,6 +353,11 @@ If \texttt{swap} were called with a variable \texttt{tmp} as its argument, e.g.
 \end{lstlisting}
 
 At runtime the expanded macro thus correctly swaps the variable's values, thanks to the guaranteed hygiene of Racket macros.
+
+
+
+\section{Extending Racket with faceted execution\label{sec:lang}}
+Having seen the interface that \textsc{Racets} exposes to its users, and with the requisite background in syntactic macros, we now turn to implementation of \textsc{Racets}. In this section, I review the current implementation, and present a more flexible and powerful approach using Racket's \texttt{\#lang} mechanism, as well as a concrete proof-of-concept illustrating a crucial technique for using \texttt{\#lang} that resolves an issue with the semantics of mutable state.
 
 
 \subsection{Racets with macros}
