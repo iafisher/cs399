@@ -1,7 +1,6 @@
 \documentclass{article}
 
-\usepackage{amsmath}
-\usepackage{color}
+\usepackage{amsmath} \usepackage{color}
 \usepackage[hidelinks]{hyperref}
 \usepackage{listings}
 \usepackage{tikz}
@@ -325,7 +324,7 @@ One final point about syntactic macros in Racket is that they are hygienic, mean
      #'(let ([x 10]) (+ x a))]))
 \end{lstlisting}
 
-If \texttt{add-ten} was used in a context where an identifier \texttt{x} was already defined, e.g.
+If \texttt{add-ten} were called with a variable \texttt{x} as its argument, e.g.
 
 \begin{lstlisting}
 (define x 32)
@@ -340,7 +339,7 @@ If \texttt{add-ten} was used in a context where an identifier \texttt{x} was alr
 (let ([x 10] (+ x x)))
 \end{lstlisting}
 
-\noindent so that \texttt{(add-ten x)} would counterintuitively evaluate to 20. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
+\noindent so that \texttt{(add-ten x)} would counterintuitively evaluate to 20, despite \texttt{x} being equal to 32 as far as the programmer was concerned. In actual fact, the macro system rewrites the identifier \texttt{x} in the macro to a name which it can guarantee will not collide with any existing identifier in the program, as demonstrated below.
 
 \begin{lstlisting}
 ; Correct -- x in the macro is rewritten as x:3
@@ -352,7 +351,7 @@ At runtime the expanded macro thus correctly evaluates to 42.
 
 
 \subsection{Racets with macros}
-\textsc{Racets} uses macros to redefine core Racket forms to make them sensitive to faceted values. For example, the transformation of function application (for a single argument) could be implemented by
+\textsc{Racets} uses macros to redefine core Racket forms to make them sensitive to faceted values. For example, the transformation of function application (for a single argument) could be implemented by\footnote{The actual implementation in \cite{racets} is more complex, because it handles multiple arguments, as well as the possibility that the function itself is faceted.}
 
 \begin{lstlisting}
 (define-syntax (#%app stx)
