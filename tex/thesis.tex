@@ -854,18 +854,25 @@ Recall that the original motivation for abstract interpretation was to improve t
  (if (and (box? displayln) (facet? (unbox displayln)))
       (unbox displayln)
       displayln)
-  ; x
-  (if (and (box? x) (facet? (unbox x)))
-    (unbox x)
-    x)
 
-  ; y
-  (if (and (box? y) (facet? (unbox y)))
-    (unbox y)
-    y))
+  (
+   ; +
+   (if (and (box? +) (facet? (unbox +)))
+        (unbox +)
+        +)
+
+    ; x
+    (if (and (box? x) (facet? (unbox x)))
+      (unbox x)
+      x)
+
+    ; y
+    (if (and (box? y) (facet? (unbox y)))
+      (unbox y)
+      y)))
 \end{lstlisting}
 
-Of course, none of these conditionals are actually necessary, because neither \texttt{displayln}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets at runtime.
+Of course, none of these conditionals are actually necessary, because neither \texttt{displayln}, nor \texttt{+}, nor \texttt{x}, nor \texttt{y} will ever be boxed facets in this code at runtime.
 
 An abstract interpreter for \textsc{Racets} would have (at a minimum) abstract domains for box and unboxed values, and for faceted and non-faceted values. If the abstract interpreter were able to determine that a particular value was never boxed, or never faceted, then the extra apparatus of faceted execution (like the conditional checks in the code snippet above) could be eliminated at compile time.
 
