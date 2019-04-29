@@ -315,6 +315,15 @@ Since syntactic macros are expanded at compile-time, they are capable of things 
 
 Each identifier in the \texttt{(\_ a b)} pattern clause matches a single top-level expression (which may be an atomic value or a compound structure like a list). The underscore matches the name of the macro itself,\footnote{The use of an underscore is purely conventional, to indicate that the macro does not care about the value it captures. Racket itself treats underscores the same as any other identifier in a syntax pattern.} and the symbols \texttt{a} and \texttt{b} match arguments to the macro.
 
+Macros that use \texttt{syntax-case} can often be abbreviated with \texttt{define-syntax-rule}. Using \texttt{define-syntax-rule}, \texttt{my-and} could be re-written as
+
+\begin{lstlisting}
+(define-syntax-rule (my-and-2 a b)
+  (if a b #f))
+\end{lstlisting}
+
+Macros defined with \texttt{define-syntax-rule} can have multiple parameters, which bind to the syntactic arguments to the macro. The body of the macro is implicitly converted from an S-expression into a syntax object.
+
 One final point about syntactic macros in Racket is that they are hygienic, meaning that identifiers introduced in the macro are protected from conflicting with identical symbols in the original source code. Consider the following macro, which increments its argument by ten:
 
 \begin{lstlisting}
