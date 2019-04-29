@@ -561,7 +561,7 @@ If this proof-of-concept were extended to handle the remaining core forms of Ful
 
 
 
-\section{Type theory\label{sec:types}}
+\section{Faceted execution and type theory\label{sec:types}}
 Since \textsc{Racets}, like Racket, is dynamically typed, errors in the use of faceted values (such as supplying the wrong policy to \texttt{obs}) are not caught until the invalid operation is attempted at runtime. A static type system for faceted values could detect many programmer errors at compile time. This section presents an introduction to formal type theory and indicates how it might be applied to faceted execution.
 
 A type system is ``a tractable syntactic method for proving the absence of certain program behaviors by classifying phrases according to the kinds of values they compute'' \cite{types}. The program behaviors that a type system are meant to prevent are generally what are called type errors: attempted operations on values for which the operation is not defined.
@@ -616,25 +616,24 @@ Type systems for real programming languages are significantly more complex, but 
 
 
 
-\section{Abstract interpretation\label{sec:ai}}
+\section{Faceted execution and abstract interpretation\label{sec:ai}}
 Another practical problem with faceted execution is that faceted code can run significantly more more slowly than non-faceted code. Functions applied to facets must be evaluated twice, once with the high-confidentiality value and once with the low-confidentiality value, resulting in a performance hit for faceted code.\footnote{It also complicates the use of functions with side-effects, which is an open problem in \textsc{Racets}.} This performance hit can be mitigated by static analysis. A static analyzer might, for instance, be able to prove that a facet is only ever resolved to its high-confidentiality value, in which case that value could be substituted for the facet as a whole, skipping double evaluation wherever it is passed to a function.
 
-One technique for static analysis is abstract interpretation \cite{abstract-inter}, wherein the computation of a program is modeled with abstract objects (e.g., the abstract category ``negative number'' instead of the concrete value $-10$) so that semantic properties of the program can be reasoned about \cite{ai-original}.
-
+One technique for static analysis is abstract interpretation \cite{abstract-inter}, wherein the computation of a program is modeled with abstract categories instead of concrete values (e.g., ``negative number'' instead of -10) so that semantic properties of the program can be deduced by a decidable procedure \cite{ai-original}.
 
 
 \subsection{Deriving abstract interpreters from abstract machines}
-Abstract interpreters can be mechanically derived from abstract machines using a technique presented in \cite{aam}. An \textit{abstract machine} is a formal mathematical object that models a computing machine. A Turing machine is perhaps the most familiar example of an abstract machine.
+Abstract interpreters can be derived from abstract machines using the technique ``abstracting abstract machines'' technique presented in \cite{aam}. An \textit{abstract machine} is a formal mathematical object that models a computing machine. Abstract machines consist of a set of elements that comprise its state, and transition rules that determine how the machine moves from state to state.
 
-Three abstract machines of increasing resemblance to real-world technology will be presented here: the CEK, CESK, and CESK* machines. Though the language that these machines evaluate (the untyped lambda calculus) is superficially very different from real programming languages, in principle the mechanisms of function definition, application, and lexical closure are the core of most actual languages, and at any rate the lambda calculus is much closer to a modern programming language than the finite transition systems that underlie the computation of a Turing machine are.
+Three abstract machines of increasing resemblance to real-world technology will be presented here: the CEK, CESK, and CESK* machines. Though the language that these machines evaluate (the untyped lambda calculus) is superficially very different from real programming languages, in principle the mechanisms of function definition, application, and lexical closure are the core of most actual languages, and at any rate the lambda calculus is much closer to a realistic programming language than, e.g., the finite transition systems that underlie the computation of a Turing machine are.
 
-The CEK machine has three elements in its state: $c$, an expression in the lambda calculus; $\rho$, an environment that maps from symbols to values; and $\kappa$, a continuation (the acronym ``CEK'' stands for the elements of the state). All values in the lambda calculus are closures, which are pairs of functions and environments.
+The CEK machine has three elements in its state: $c$, an expression in the lambda calculus; $\rho$, an environment that maps from symbols to values; and $\kappa$, a continuation (the acronym ``CEK'' stands for the elements of the state). All values in the lambda calculus are closures, which are represented by pairs of lambda functions and environments.
 
-Continuations are mathematical structures for representing control flow. Intuitively, a continuation encapsulates what the machine should do next after evaluating the current expression. For the lambda calculus, the sequence of machine operations is very simple, as only function application (of the three syntactic terms) requires any control flow at all: the function is evaluated first, followed by the argument, and then the body of the function. At each step, the continuation stores what the next step is.
+A continuation is a mathematical structure for representing control flow. Intuitively, a continuation encapsulates what the machine should do next after evaluating the current expression. For the lambda calculus, the sequence of machine operations is very simple, as only function application (of the three syntactic terms) requires any control flow at all: the function is evaluated first, followed by the argument, and then the body of the function. At each step, the continuation stores what the next step is.
 
-In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \kappa)$, $\textbf{fn}((\lambda x.e), \rho, \kappa)$, and $\textbf{mt}$. The first form represents evaluating an argument $e$, and the second form represents evaluating the body of a function. The third form is the empty continuation, which halts execution. In the first two forms, $\rho$ is the environment in which the expression is to be evaluated, and $\kappa$ is the continuation that is to be followed afterwards.
+In the CEK machine, continuations come in three forms: $\textbf{ar}(e, \rho, \kappa)$ for evaluating an argument, $\textbf{fn}((\lambda x.e), \rho, \kappa)$ for evaluating the body of a function, and $\textbf{mt}$ (``empty'') for halting computation. In the first two forms, $\rho$ is the environment in which the expression is to be evaluated, and $\kappa$ is the continuation that is to be followed afterwards.
 
-The entirety of the operation of the CEK machine is described by four rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
+The entirety of the operation of the CEK machine is described by four transition rules that map from one machine state (a 3-tuple of expression, environment and continuation) to another.\footnote{These rules are reproduced and slightly modified from Figure 1 on p. 2 of \cite{aam}. See \cite{cek} for a different formulation of the CEK machine's transition rules.} The first rule is for evaluating variables:
 
 % Evaluating a symbol (CEK)
 $$
